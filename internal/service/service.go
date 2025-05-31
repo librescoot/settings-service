@@ -108,8 +108,8 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 
 	// Log any fields that don't match expected patterns
 	for field := range settings {
-		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") {
-			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', or 'updates.'", field)
+		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") {
+			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', or 'dashboard.'", field)
 		}
 	}
 
