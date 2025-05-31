@@ -12,6 +12,7 @@ const TomlFilePath = "/data/settings.toml"
 type Config struct {
 	Scooter  map[string]interface{} `toml:"scooter"`
 	Cellular map[string]interface{} `toml:"cellular"`
+	Updates  map[string]interface{} `toml:"updates"`
 }
 
 // LoadFromFile reads the TOML configuration file
@@ -58,6 +59,7 @@ func ParseRedisSettings(settings map[string]string) *Config {
 	config := &Config{
 		Scooter:  make(map[string]interface{}),
 		Cellular: make(map[string]interface{}),
+		Updates:  make(map[string]interface{}),
 	}
 
 	for field, value := range settings {
@@ -67,6 +69,9 @@ func ParseRedisSettings(settings map[string]string) *Config {
 		} else if len(field) > 9 && field[:9] == "cellular." {
 			key := field[9:]
 			config.Cellular[key] = value
+		} else if len(field) > 8 && field[:8] == "updates." {
+			key := field[8:]
+			config.Updates[key] = value
 		}
 	}
 
@@ -83,6 +88,10 @@ func (c *Config) ToRedisFields() map[string]interface{} {
 
 	for key, value := range c.Cellular {
 		fields[fmt.Sprintf("cellular.%s", key)] = fmt.Sprintf("%v", value)
+	}
+
+	for key, value := range c.Updates {
+		fields[fmt.Sprintf("updates.%s", key)] = fmt.Sprintf("%v", value)
 	}
 
 	return fields
