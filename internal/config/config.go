@@ -14,6 +14,7 @@ type Config struct {
 	Cellular  map[string]interface{} `toml:"cellular"`
 	Updates   map[string]interface{} `toml:"updates"`
 	Dashboard map[string]interface{} `toml:"dashboard"`
+	Alarm     map[string]interface{} `toml:"alarm"`
 }
 
 // LoadFromFile reads the TOML configuration file
@@ -62,6 +63,7 @@ func ParseRedisSettings(settings map[string]string) *Config {
 		Cellular:  make(map[string]interface{}),
 		Updates:   make(map[string]interface{}),
 		Dashboard: make(map[string]interface{}),
+		Alarm:     make(map[string]interface{}),
 	}
 
 	for field, value := range settings {
@@ -77,6 +79,9 @@ func ParseRedisSettings(settings map[string]string) *Config {
 		} else if len(field) > 10 && field[:10] == "dashboard." {
 			key := field[10:]
 			config.Dashboard[key] = value
+		} else if len(field) > 6 && field[:6] == "alarm." {
+			key := field[6:]
+			config.Alarm[key] = value
 		}
 	}
 
@@ -101,6 +106,10 @@ func (c *Config) ToRedisFields() map[string]interface{} {
 
 	for key, value := range c.Dashboard {
 		fields[fmt.Sprintf("dashboard.%s", key)] = fmt.Sprintf("%v", value)
+	}
+
+	for key, value := range c.Alarm {
+		fields[fmt.Sprintf("alarm.%s", key)] = fmt.Sprintf("%v", value)
 	}
 
 	return fields
