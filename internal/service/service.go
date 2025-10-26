@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/librescoot/settings-service/internal/config"
@@ -65,17 +64,19 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	log.Printf("Loaded %d settings from TOML file to Redis", len(fields))
 
 	// Check if APN needs to be synchronized on startup
-	if apn, exists := cfg.Cellular["apn"]; exists && apn != "" {
-		currentAPN, err := network.GetCurrentAPN()
-		if err != nil {
-			log.Printf("Error reading current APN: %v", err)
-		} else if currentAPN != fmt.Sprintf("%v", apn) {
-			log.Printf("APN mismatch detected: NetworkManager has '%s', settings have '%v'", currentAPN, apn)
-			if err := network.UpdateAPN(fmt.Sprintf("%v", apn)); err != nil {
-				log.Printf("Error updating NetworkManager APN on startup: %v", err)
+	if cellularSection, exists := cfg.Sections["cellular"]; exists {
+		if apn, exists := cellularSection["apn"]; exists && apn != "" {
+			currentAPN, err := network.GetCurrentAPN()
+			if err != nil {
+				log.Printf("Error reading current APN: %v", err)
+			} else if currentAPN != fmt.Sprintf("%v", apn) {
+				log.Printf("APN mismatch detected: NetworkManager has '%s', settings have '%v'", currentAPN, apn)
+				if err := network.UpdateAPN(fmt.Sprintf("%v", apn)); err != nil {
+					log.Printf("Error updating NetworkManager APN on startup: %v", err)
+				}
+			} else {
+				log.Printf("APN is already synchronized: %v", apn)
 			}
-		} else {
-			log.Printf("APN is already synchronized: %v", apn)
 		}
 	}
 
@@ -95,13 +96,6 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	log.Printf("Retrieved %d settings from Redis", len(settings))
 	for k, v := range settings {
 		log.Printf("  %s = %s", k, v)
-	}
-
-	// Log any fields that don't match expected patterns
-	for field := range settings {
-		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") && !strings.HasPrefix(field, "alarm.") && !strings.HasPrefix(field, "engine-ecu.") {
-			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', 'dashboard.', 'alarm.', or 'engine-ecu.'", field)
-		}
 	}
 
 	// Parse settings and save to file
