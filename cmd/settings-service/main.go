@@ -12,7 +12,10 @@ import (
 	"github.com/librescoot/settings-service/internal/wireguard"
 )
 
+var version = "dev"
+
 func main() {
+	log.Printf("librescoot-settings %s starting", version)
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
