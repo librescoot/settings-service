@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -15,6 +17,14 @@ import (
 var version = "dev"
 
 func main() {
+	showVersion := flag.Bool("version", false, "Print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("settings-service %s\n", version)
+		return
+	}
+
 	log.Printf("librescoot-settings %s starting", version)
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
