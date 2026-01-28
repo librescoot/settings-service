@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/librescoot/settings-service/internal/fileutil"
@@ -59,21 +60,16 @@ func ParseRedisSettings(settings map[string]string) *Config {
 	}
 
 	for field, value := range settings {
-		if len(field) > 8 && field[:8] == "scooter." {
-			key := field[8:]
-			config.Scooter[key] = value
-		} else if len(field) > 9 && field[:9] == "cellular." {
-			key := field[9:]
-			config.Cellular[key] = value
-		} else if len(field) > 8 && field[:8] == "updates." {
-			key := field[8:]
-			config.Updates[key] = value
-		} else if len(field) > 10 && field[:10] == "dashboard." {
-			key := field[10:]
-			config.Dashboard[key] = value
-		} else if len(field) > 6 && field[:6] == "alarm." {
-			key := field[6:]
-			config.Alarm[key] = value
+		if strings.HasPrefix(field, "scooter.") {
+			config.Scooter[strings.TrimPrefix(field, "scooter.")] = value
+		} else if strings.HasPrefix(field, "cellular.") {
+			config.Cellular[strings.TrimPrefix(field, "cellular.")] = value
+		} else if strings.HasPrefix(field, "updates.") {
+			config.Updates[strings.TrimPrefix(field, "updates.")] = value
+		} else if strings.HasPrefix(field, "dashboard.") {
+			config.Dashboard[strings.TrimPrefix(field, "dashboard.")] = value
+		} else if strings.HasPrefix(field, "alarm.") {
+			config.Alarm[strings.TrimPrefix(field, "alarm.")] = value
 		}
 	}
 
