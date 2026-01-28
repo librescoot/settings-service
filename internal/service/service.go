@@ -42,33 +42,24 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Always flush existing settings in Redis first
-	log.Println("Flushing existing settings in Redis")
-	if err := s.redisClient.FlushSettings(); err != nil {
-		return fmt.Errorf("failed to flush settings: %w", err)
-	}
-
 	// Load configuration from file
 	cfg, err := config.LoadFromFile()
 	if err != nil {
 		if os.IsNotExist(err) {
+			log.Println("Flushing existing settings in Redis")
+			if err := s.redisClient.FlushSettings(); err != nil {
+				return fmt.Errorf("failed to flush settings: %w", err)
+			}
 			log.Printf("TOML file %s does not exist, Redis settings cleared", config.TomlFilePath)
 			return nil
 		}
 		return err
 	}
 
-	// If scooter section is nil or empty, we already flushed Redis
-	if cfg.Scooter == nil || len(cfg.Scooter) == 0 {
-		log.Println("Empty or missing [scooter] section, Redis settings remain cleared")
-	}
-
-	// Convert to Redis fields and save
+	// Atomically replace all settings in Redis (flush + set in one pipeline)
 	fields := cfg.ToRedisFields()
-	if len(fields) > 0 {
-		if err := s.redisClient.SetSettings(fields); err != nil {
-			return fmt.Errorf("failed to write settings to Redis: %w", err)
-		}
+	if err := s.redisClient.ReplaceSettings(fields); err != nil {
+		return fmt.Errorf("failed to write settings to Redis: %w", err)
 	}
 
 	log.Printf("Loaded %d settings from TOML file to Redis", len(fields))

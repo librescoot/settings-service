@@ -64,6 +64,18 @@ func (c *Client) SetSettings(fields map[string]interface{}) error {
 	return err
 }
 
+// ReplaceSettings atomically deletes all settings and writes new ones in a
+// single pipeline, avoiding a window where other services see empty settings.
+func (c *Client) ReplaceSettings(fields map[string]interface{}) error {
+	pipe := c.client.Pipeline()
+	pipe.Del(c.ctx, SettingsKey)
+	for field, value := range fields {
+		pipe.HSet(c.ctx, SettingsKey, field, value)
+	}
+	_, err := pipe.Exec(c.ctx)
+	return err
+}
+
 // WatchChannel returns the pubsub channel for monitoring updates
 func (c *Client) WatchChannel() <-chan *redis.Message {
 	return c.pubsub.Channel()
