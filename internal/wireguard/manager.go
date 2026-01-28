@@ -98,6 +98,7 @@ func (m *Manager) deleteExistingConnections() error {
 
 	lines := strings.Split(string(output), "\n")
 	deletedCount := 0
+	var failed []string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -109,10 +110,11 @@ func (m *Manager) deleteExistingConnections() error {
 		if len(parts) >= 2 && parts[1] == "wireguard" {
 			connName := parts[0]
 			log.Printf("Deleting WireGuard connection: %s", connName)
-			
+
 			cmd := exec.Command("nmcli", "con", "delete", connName)
 			if err := cmd.Run(); err != nil {
 				log.Printf("Warning: Failed to delete connection %s: %v", connName, err)
+				failed = append(failed, connName)
 			} else {
 				deletedCount++
 			}
@@ -120,6 +122,9 @@ func (m *Manager) deleteExistingConnections() error {
 	}
 
 	log.Printf("Deleted %d WireGuard connections", deletedCount)
+	if len(failed) > 0 {
+		return fmt.Errorf("failed to delete %d connections: %s", len(failed), strings.Join(failed, ", "))
+	}
 	return nil
 }
 
