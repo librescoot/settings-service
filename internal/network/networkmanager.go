@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/librescoot/settings-service/internal/fileutil"
 )
 
 const NMConnectionPath = "/etc/NetworkManager/system-connections/wwan.nmconnection"
@@ -90,9 +92,11 @@ func UpdateAPN(apn string) error {
 		return nil
 	}
 
-	// Write the updated content back
 	updatedContent := strings.Join(lines, "\n")
-	if err := os.WriteFile(NMConnectionPath, []byte(updatedContent), 0600); err != nil {
+	if err := fileutil.AtomicWrite(NMConnectionPath, 0600, func(f *os.File) error {
+		_, err := f.WriteString(updatedContent)
+		return err
+	}); err != nil {
 		return fmt.Errorf("failed to write NetworkManager connection file: %w", err)
 	}
 

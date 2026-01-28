@@ -35,8 +35,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create settings service: %v", err)
 	}
-	defer svc.Close()
-
 	// Load initial settings from TOML file
 	if err := svc.LoadSettingsFromTOML(); err != nil {
 		log.Printf("Warning: Failed to load initial settings from TOML: %v", err)

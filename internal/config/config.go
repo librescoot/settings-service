@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/librescoot/settings-service/internal/fileutil"
 )
 
 const TomlFilePath = "/data/settings.toml"
@@ -42,18 +43,9 @@ func SaveToFile(config *Config) error {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	file, err := os.Create(TomlFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to create TOML file: %w", err)
-	}
-	defer file.Close()
-
-	encoder := toml.NewEncoder(file)
-	if err := encoder.Encode(config); err != nil {
-		return fmt.Errorf("failed to encode TOML: %w", err)
-	}
-
-	return nil
+	return fileutil.AtomicWrite(TomlFilePath, 0644, func(f *os.File) error {
+		return toml.NewEncoder(f).Encode(config)
+	})
 }
 
 // ParseRedisSettings converts Redis hash fields to Config structure
