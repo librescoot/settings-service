@@ -25,6 +25,12 @@ func main() {
 		return
 	}
 
+	if os.Getenv("JOURNAL_STREAM") != "" {
+		log.SetFlags(0)
+	} else {
+		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	}
+
 	log.Printf("librescoot-settings %s starting", version)
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
