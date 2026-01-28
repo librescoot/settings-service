@@ -151,7 +151,9 @@ func (s *SettingsService) WatchSettings() {
 
 // updateAPNFromRedis reads the APN from Redis and updates NetworkManager
 func (s *SettingsService) updateAPNFromRedis() {
+	s.mu.Lock()
 	settings, err := s.redisClient.GetAllSettings()
+	s.mu.Unlock()
 	if err != nil {
 		log.Printf("Error getting settings for APN update: %v", err)
 		return
