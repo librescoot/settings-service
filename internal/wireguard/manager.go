@@ -1,6 +1,7 @@
 package wireguard
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,45 +9,50 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/go-redis/redis/v8"
 )
 
 const (
 	WireGuardConfigDir = "/data/wireguard"
-	StartupDelay      = 120 * time.Second
+	DefaultTimeout     = 120 * time.Second
+	SettlingDelay      = 3 * time.Second
+	PollInterval       = 2 * time.Second
 )
 
 // Manager handles WireGuard connection lifecycle
 type Manager struct {
-	configDir string
-	delay     time.Duration
+	configDir   string
+	timeout     time.Duration
+	redisClient *redis.Client
 }
 
-// NewManager creates a new WireGuard manager
-func NewManager() *Manager {
+// NewManager creates a new WireGuard manager with a Redis client for internet detection
+func NewManager(redisClient *redis.Client) *Manager {
 	return &Manager{
-		configDir: WireGuardConfigDir,
-		delay:     StartupDelay,
+		configDir:   WireGuardConfigDir,
+		timeout:     DefaultTimeout,
+		redisClient: redisClient,
 	}
 }
 
 // NewManagerWithOptions creates a manager with custom options (useful for testing)
-func NewManagerWithOptions(configDir string, delay time.Duration) *Manager {
+func NewManagerWithOptions(configDir string, timeout time.Duration, redisClient *redis.Client) *Manager {
 	return &Manager{
-		configDir: configDir,
-		delay:     delay,
+		configDir:   configDir,
+		timeout:     timeout,
+		redisClient: redisClient,
 	}
 }
 
 // Initialize performs the WireGuard initialization sequence
-func (m *Manager) Initialize() error {
+func (m *Manager) Initialize(ctx context.Context) error {
 	log.Println("Starting WireGuard initialization...")
 
-	// Always delete existing WireGuard connections first
 	if err := m.deleteExistingConnections(); err != nil {
 		return fmt.Errorf("failed to delete existing connections: %w", err)
 	}
 
-	// Check if we should import new configurations
 	shouldImport, err := m.shouldImportConfigs()
 	if err != nil {
 		log.Printf("Error checking for WireGuard configs: %v", err)
@@ -57,11 +63,10 @@ func (m *Manager) Initialize() error {
 		return nil
 	}
 
-	// Wait before importing new connections
-	log.Printf("Waiting %v before importing WireGuard configurations...", m.delay)
-	time.Sleep(m.delay)
+	if err := m.waitForInternet(ctx); err != nil {
+		return fmt.Errorf("internet wait cancelled: %w", err)
+	}
 
-	// Import new connections
 	if err := m.importConfigurations(); err != nil {
 		return fmt.Errorf("failed to import configurations: %w", err)
 	}
@@ -70,14 +75,87 @@ func (m *Manager) Initialize() error {
 	return nil
 }
 
+// waitForInternet waits for internet connectivity via Redis, falling back to a timeout
+func (m *Manager) waitForInternet(ctx context.Context) error {
+	if m.redisClient == nil {
+		log.Printf("No Redis client, waiting %v before importing WireGuard configurations...", m.timeout)
+		select {
+		case <-time.After(m.timeout):
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	if m.isInternetConnected(ctx) {
+		log.Println("Internet already connected, settling before WireGuard import...")
+		select {
+		case <-time.After(SettlingDelay):
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	log.Printf("Waiting for internet connectivity (timeout %v)...", m.timeout)
+
+	pubsub := m.redisClient.Subscribe(ctx, "internet")
+	defer pubsub.Close()
+
+	msgCh := pubsub.Channel()
+	pollTicker := time.NewTicker(PollInterval)
+	defer pollTicker.Stop()
+	timeoutTimer := time.NewTimer(m.timeout)
+	defer timeoutTimer.Stop()
+
+	for {
+		select {
+		case msg := <-msgCh:
+			if msg != nil && msg.Payload == "status" {
+				if m.isInternetConnected(ctx) {
+					log.Println("Internet connected (via pub/sub), settling before WireGuard import...")
+					select {
+					case <-time.After(SettlingDelay):
+						return nil
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+				}
+			}
+		case <-pollTicker.C:
+			if m.isInternetConnected(ctx) {
+				log.Println("Internet connected (via poll), settling before WireGuard import...")
+				select {
+				case <-time.After(SettlingDelay):
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		case <-timeoutTimer.C:
+			log.Printf("Internet wait timed out after %v, proceeding with WireGuard import anyway", m.timeout)
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// isInternetConnected checks the Redis internet hash for connected status
+func (m *Manager) isInternetConnected(ctx context.Context) bool {
+	status, err := m.redisClient.HGet(ctx, "internet", "status").Result()
+	if err != nil {
+		return false
+	}
+	return status == "connected"
+}
+
 // shouldImportConfigs checks if there are config files to import
 func (m *Manager) shouldImportConfigs() (bool, error) {
-	// Check if directory exists
 	if _, err := os.Stat(m.configDir); os.IsNotExist(err) {
 		return false, nil
 	}
 
-	// Check for .conf files
 	pattern := filepath.Join(m.configDir, "*.conf")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -89,7 +167,6 @@ func (m *Manager) shouldImportConfigs() (bool, error) {
 
 // deleteExistingConnections removes all existing WireGuard connections
 func (m *Manager) deleteExistingConnections() error {
-	// Get list of WireGuard connections
 	cmd := exec.Command("nmcli", "-t", "-f", "NAME,TYPE", "con", "show")
 	output, err := cmd.Output()
 	if err != nil {
@@ -130,13 +207,11 @@ func (m *Manager) deleteExistingConnections() error {
 
 // importConfigurations imports all WireGuard config files from the config directory
 func (m *Manager) importConfigurations() error {
-	// Check if directory exists
 	if _, err := os.Stat(m.configDir); os.IsNotExist(err) {
 		log.Printf("WireGuard config directory %s does not exist, skipping import", m.configDir)
 		return nil
 	}
 
-	// Find all .conf files
 	pattern := filepath.Join(m.configDir, "*.conf")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -151,7 +226,7 @@ func (m *Manager) importConfigurations() error {
 	importedCount := 0
 	for _, file := range files {
 		log.Printf("Importing WireGuard configuration: %s", filepath.Base(file))
-		
+
 		cmd := exec.Command("nmcli", "connection", "import", "type", "wireguard", "file", file)
 		if err := cmd.Run(); err != nil {
 			log.Printf("Warning: Failed to import %s: %v", file, err)

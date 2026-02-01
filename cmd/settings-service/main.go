@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/librescoot/settings-service/internal/service"
 	"github.com/librescoot/settings-service/internal/wireguard"
 )
@@ -47,9 +48,14 @@ func main() {
 	}
 
 	// Initialize WireGuard connections
-	wgManager := wireguard.NewManager()
+	wgRedis := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+	})
+	wgCtx, wgCancel := context.WithCancel(context.Background())
+	wgManager := wireguard.NewManager(wgRedis)
 	go func() {
-		if err := wgManager.Initialize(); err != nil {
+		defer wgRedis.Close()
+		if err := wgManager.Initialize(wgCtx); err != nil {
 			log.Printf("Error initializing WireGuard: %v", err)
 		}
 	}()
@@ -65,7 +71,9 @@ func main() {
 	<-sigChan
 
 	log.Println("Shutting down settings service...")
-	
+
+	wgCancel()
+
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
