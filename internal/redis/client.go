@@ -64,14 +64,15 @@ func (c *Client) SetSettings(fields map[string]interface{}) error {
 	return err
 }
 
-// ReplaceSettings atomically deletes all settings and writes new ones in a
-// single pipeline, avoiding a window where other services see empty settings.
+// ReplaceSettings atomically deletes all settings, writes new ones, and
+// publishes a reload notification so subscribers refresh their state.
 func (c *Client) ReplaceSettings(fields map[string]interface{}) error {
 	pipe := c.client.Pipeline()
 	pipe.Del(c.ctx, SettingsKey)
 	for field, value := range fields {
 		pipe.HSet(c.ctx, SettingsKey, field, value)
 	}
+	pipe.Publish(c.ctx, SettingsChannel, "reload")
 	_, err := pipe.Exec(c.ctx)
 	return err
 }
