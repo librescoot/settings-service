@@ -13,11 +13,12 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+var WireGuardConfigDir = "/data/wireguard"
+
 const (
-	WireGuardConfigDir = "/data/wireguard"
-	DefaultTimeout     = 120 * time.Second
-	SettlingDelay      = 3 * time.Second
-	PollInterval       = 2 * time.Second
+	DefaultTimeout = 120 * time.Second
+	SettlingDelay  = 3 * time.Second
+	PollInterval   = 2 * time.Second
 )
 
 // Manager handles WireGuard connection lifecycle

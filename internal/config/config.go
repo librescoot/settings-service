@@ -3,13 +3,14 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/librescoot/settings-service/internal/fileutil"
 )
 
-const TomlFilePath = "/data/settings.toml"
+var TomlFilePath = "/data/settings.toml"
 
 type Config struct {
 	Scooter   map[string]interface{} `toml:"scooter"`
@@ -42,8 +43,8 @@ func LoadFromFile() (*Config, error) {
 
 // SaveToFile writes the configuration to the TOML file
 func SaveToFile(config *Config) error {
-	if err := os.MkdirAll("/data", 0755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+	if err := os.MkdirAll(filepath.Dir(TomlFilePath), 0755); err != nil {
+		return fmt.Errorf("failed to create settings directory: %w", err)
 	}
 
 	return fileutil.AtomicWrite(TomlFilePath, 0644, func(f *os.File) error {

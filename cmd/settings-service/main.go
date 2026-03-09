@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/librescoot/settings-service/internal/config"
 	"github.com/librescoot/settings-service/internal/service"
 	"github.com/librescoot/settings-service/internal/wireguard"
 )
@@ -19,11 +20,20 @@ var version = "dev"
 
 func main() {
 	showVersion := flag.Bool("version", false, "Print version and exit")
+	settingsFile := flag.String("settings-file", "", "Path to settings TOML file (default: /data/settings.toml)")
+	wgConfigDir := flag.String("wireguard-config-dir", "", "Path to WireGuard config directory (default: /data/wireguard)")
 	flag.Parse()
 
 	if *showVersion {
 		fmt.Printf("settings-service %s\n", version)
 		return
+	}
+
+	if *settingsFile != "" {
+		config.TomlFilePath = *settingsFile
+	}
+	if *wgConfigDir != "" {
+		wireguard.WireGuardConfigDir = *wgConfigDir
 	}
 
 	if os.Getenv("JOURNAL_STREAM") != "" {
