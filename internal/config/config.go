@@ -12,12 +12,8 @@ import (
 const TomlFilePath = "/data/settings.toml"
 
 type Config struct {
-	Scooter   map[string]interface{} `toml:"scooter"`
-	Cellular  map[string]interface{} `toml:"cellular"`
-	Updates   map[string]interface{} `toml:"updates"`
-	Dashboard map[string]interface{} `toml:"dashboard"`
-	Alarm     map[string]interface{} `toml:"alarm"`
-	EngineECU map[string]interface{} `toml:"engine-ecu"`
+	Fields   map[string]interface{}
+	Sections map[string]map[string]interface{}
 }
 
 // LoadFromFile reads the TOML configuration file
@@ -31,12 +27,24 @@ func LoadFromFile() (*Config, error) {
 		return nil, fmt.Errorf("failed to read TOML file: %w", err)
 	}
 
-	var config Config
-	if err := toml.Unmarshal(data, &config); err != nil {
+	var raw map[string]interface{}
+	if err := toml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("failed to parse TOML file: %w", err)
 	}
 
-	return &config, nil
+	cfg := &Config{
+		Fields:   make(map[string]interface{}),
+		Sections: make(map[string]map[string]interface{}),
+	}
+	for key, val := range raw {
+		if section, ok := val.(map[string]interface{}); ok {
+			cfg.Sections[key] = section
+		} else {
+			cfg.Fields[key] = val
+		}
+	}
+
+	return cfg, nil
 }
 
 // SaveToFile writes the configuration to the TOML file
@@ -46,66 +54,56 @@ func SaveToFile(config *Config) error {
 	}
 
 	return fileutil.AtomicWrite(TomlFilePath, 0644, func(f *os.File) error {
-		return toml.NewEncoder(f).Encode(config)
+		out := make(map[string]interface{}, len(config.Fields)+len(config.Sections))
+		for k, v := range config.Fields {
+			out[k] = v
+		}
+		for k, v := range config.Sections {
+			out[k] = v
+		}
+		return toml.NewEncoder(f).Encode(out)
 	})
 }
 
 // ParseRedisSettings converts Redis hash fields to Config structure
 func ParseRedisSettings(settings map[string]string) *Config {
-	config := &Config{
-		Scooter:   make(map[string]interface{}),
-		Cellular:  make(map[string]interface{}),
-		Updates:   make(map[string]interface{}),
-		Dashboard: make(map[string]interface{}),
-		Alarm:     make(map[string]interface{}),
-		EngineECU: make(map[string]interface{}),
+	cfg := &Config{
+		Fields:   make(map[string]interface{}),
+		Sections: make(map[string]map[string]interface{}),
 	}
 
 	for field, value := range settings {
-		if strings.HasPrefix(field, "scooter.") {
-			config.Scooter[strings.TrimPrefix(field, "scooter.")] = value
-		} else if strings.HasPrefix(field, "cellular.") {
-			config.Cellular[strings.TrimPrefix(field, "cellular.")] = value
-		} else if strings.HasPrefix(field, "updates.") {
-			config.Updates[strings.TrimPrefix(field, "updates.")] = value
-		} else if strings.HasPrefix(field, "dashboard.") {
-			config.Dashboard[strings.TrimPrefix(field, "dashboard.")] = value
-		} else if strings.HasPrefix(field, "alarm.") {
-			config.Alarm[strings.TrimPrefix(field, "alarm.")] = value
-		} else if strings.HasPrefix(field, "engine-ecu.") {
-			config.EngineECU[strings.TrimPrefix(field, "engine-ecu.")] = value
+		parts := strings.SplitN(field, ".", 2)
+		if len(parts) != 2 {
+			cfg.Fields[field] = value
+			continue
 		}
+
+		section := parts[0]
+		key := parts[1]
+
+		if cfg.Sections[section] == nil {
+			cfg.Sections[section] = make(map[string]interface{})
+		}
+
+		cfg.Sections[section][key] = value
 	}
 
-	return config
+	return cfg
 }
 
 // ToRedisFields converts Config to Redis hash fields
 func (c *Config) ToRedisFields() map[string]interface{} {
 	fields := make(map[string]interface{})
 
-	for key, value := range c.Scooter {
-		fields[fmt.Sprintf("scooter.%s", key)] = fmt.Sprintf("%v", value)
+	for key, value := range c.Fields {
+		fields[key] = fmt.Sprintf("%v", value)
 	}
 
-	for key, value := range c.Cellular {
-		fields[fmt.Sprintf("cellular.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.Updates {
-		fields[fmt.Sprintf("updates.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.Dashboard {
-		fields[fmt.Sprintf("dashboard.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.Alarm {
-		fields[fmt.Sprintf("alarm.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.EngineECU {
-		fields[fmt.Sprintf("engine-ecu.%s", key)] = fmt.Sprintf("%v", value)
+	for section, sectionMap := range c.Sections {
+		for key, value := range sectionMap {
+			fields[fmt.Sprintf("%s.%s", section, key)] = fmt.Sprintf("%v", value)
+		}
 	}
 
 	return fields

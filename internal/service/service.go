@@ -5,13 +5,32 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/librescoot/settings-service/internal/config"
 	"github.com/librescoot/settings-service/internal/network"
 	"github.com/librescoot/settings-service/internal/redis"
 )
+
+var knownSections = map[string]bool{
+	"scooter":    true,
+	"cellular":   true,
+	"updates":    true,
+	"dashboard":  true,
+	"alarm":      true,
+	"engine-ecu": true,
+}
+
+func warnUnknown(cfg *config.Config) {
+	for section := range cfg.Sections {
+		if !knownSections[section] {
+			log.Printf("warning: unknown settings section %q", section)
+		}
+	}
+	for key := range cfg.Fields {
+		log.Printf("warning: unknown top-level setting %q", key)
+	}
+}
 
 type SettingsService struct {
 	redisClient *redis.Client
@@ -56,6 +75,8 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		return err
 	}
 
+	warnUnknown(cfg)
+
 	// Atomically replace all settings in Redis (flush + set in one pipeline)
 	fields := cfg.ToRedisFields()
 	if err := s.redisClient.ReplaceSettings(fields); err != nil {
@@ -65,17 +86,19 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	log.Printf("Loaded %d settings from TOML file to Redis", len(fields))
 
 	// Check if APN needs to be synchronized on startup
-	if apn, exists := cfg.Cellular["apn"]; exists && apn != "" {
-		currentAPN, err := network.GetCurrentAPN()
-		if err != nil {
-			log.Printf("Error reading current APN: %v", err)
-		} else if currentAPN != fmt.Sprintf("%v", apn) {
-			log.Printf("APN mismatch detected: NetworkManager has '%s', settings have '%v'", currentAPN, apn)
-			if err := network.UpdateAPN(fmt.Sprintf("%v", apn)); err != nil {
-				log.Printf("Error updating NetworkManager APN on startup: %v", err)
+	if cellularSection, exists := cfg.Sections["cellular"]; exists {
+		if apn, exists := cellularSection["apn"]; exists && apn != "" {
+			currentAPN, err := network.GetCurrentAPN()
+			if err != nil {
+				log.Printf("Error reading current APN: %v", err)
+			} else if currentAPN != fmt.Sprintf("%v", apn) {
+				log.Printf("APN mismatch detected: NetworkManager has '%s', settings have '%v'", currentAPN, apn)
+				if err := network.UpdateAPN(fmt.Sprintf("%v", apn)); err != nil {
+					log.Printf("Error updating NetworkManager APN on startup: %v", err)
+				}
+			} else {
+				log.Printf("APN is already synchronized: %v", apn)
 			}
-		} else {
-			log.Printf("APN is already synchronized: %v", apn)
 		}
 	}
 
@@ -97,15 +120,10 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		log.Printf("  %s = %s", k, v)
 	}
 
-	// Log any fields that don't match expected patterns
-	for field := range settings {
-		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") && !strings.HasPrefix(field, "alarm.") && !strings.HasPrefix(field, "engine-ecu.") {
-			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', 'dashboard.', 'alarm.', or 'engine-ecu.'", field)
-		}
-	}
+	cfg := config.ParseRedisSettings(settings)
+	warnUnknown(cfg)
 
 	// Parse settings and save to file
-	cfg := config.ParseRedisSettings(settings)
 	if err := config.SaveToFile(cfg); err != nil {
 		return err
 	}
