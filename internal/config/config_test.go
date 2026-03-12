@@ -14,19 +14,20 @@ func TestParseRedisSettings(t *testing.T) {
 		{
 			name: "parse standard sections",
 			input: map[string]string{
-				"scooter.speed_limit": "25",
-				"scooter.mode":        "eco",
-				"cellular.apn":        "internet.provider.com",
-				"updates.channel":     "stable",
+				"scooter.auto-standby-seconds": "300",
+				"scooter.brake-hibernation":    "true",
+				"cellular.apn":                 "internet.lebara.de",
+				"updates.channel":              "stable",
 			},
 			expected: &Config{
+				Fields: map[string]interface{}{},
 				Sections: map[string]map[string]interface{}{
 					"scooter": {
-						"speed_limit": "25",
-						"mode":        "eco",
+						"auto-standby-seconds": "300",
+						"brake-hibernation":    "true",
 					},
 					"cellular": {
-						"apn": "internet.provider.com",
+						"apn": "internet.lebara.de",
 					},
 					"updates": {
 						"channel": "stable",
@@ -35,50 +36,53 @@ func TestParseRedisSettings(t *testing.T) {
 			},
 		},
 		{
-			name: "parse custom sections",
+			name: "parse arbitrary section names",
 			input: map[string]string{
-				"custom.setting1":  "value1",
-				"another.setting2": "value2",
-				"foo.bar":          "baz",
+				"engine-ecu.mode":    "normal",
+				"engine-ecu.torque":  "100",
+				"alarm.enabled":      "true",
 			},
 			expected: &Config{
+				Fields: map[string]interface{}{},
 				Sections: map[string]map[string]interface{}{
-					"custom": {
-						"setting1": "value1",
+					"engine-ecu": {
+						"mode":   "normal",
+						"torque": "100",
 					},
-					"another": {
-						"setting2": "value2",
-					},
-					"foo": {
-						"bar": "baz",
+					"alarm": {
+						"enabled": "true",
 					},
 				},
 			},
 		},
 		{
-			name: "ignore keys without dots",
+			name: "top-level keys without dots",
 			input: map[string]string{
-				"scooter.speed_limit": "25",
-				"invalidkey":          "should_be_ignored",
-				"cellular.apn":        "internet.provider.com",
+				"scooter.brake-hibernation": "true",
+				"version":                   "1",
+				"cellular.apn":              "internet.lebara.de",
 			},
 			expected: &Config{
+				Fields: map[string]interface{}{
+					"version": "1",
+				},
 				Sections: map[string]map[string]interface{}{
 					"scooter": {
-						"speed_limit": "25",
+						"brake-hibernation": "true",
 					},
 					"cellular": {
-						"apn": "internet.provider.com",
+						"apn": "internet.lebara.de",
 					},
 				},
 			},
 		},
 		{
-			name: "handle keys with multiple dots",
+			name: "keys with multiple dots go into section with remainder as key",
 			input: map[string]string{
 				"scooter.nested.setting": "value",
 			},
 			expected: &Config{
+				Fields: map[string]interface{}{},
 				Sections: map[string]map[string]interface{}{
 					"scooter": {
 						"nested.setting": "value",
@@ -87,9 +91,10 @@ func TestParseRedisSettings(t *testing.T) {
 			},
 		},
 		{
-			name:  "handle empty input",
+			name:  "empty input",
 			input: map[string]string{},
 			expected: &Config{
+				Fields:   map[string]interface{}{},
 				Sections: map[string]map[string]interface{}{},
 			},
 		},
@@ -112,50 +117,50 @@ func TestToRedisFields(t *testing.T) {
 		expected map[string]interface{}
 	}{
 		{
-			name: "convert standard sections",
+			name: "convert sections",
 			config: &Config{
 				Sections: map[string]map[string]interface{}{
 					"scooter": {
-						"speed_limit": "25",
-						"mode":        "eco",
+						"auto-standby-seconds": "300",
+						"enable-horn":          "true",
 					},
 					"cellular": {
-						"apn": "internet.provider.com",
+						"apn": "internet.lebara.de",
 					},
 				},
 			},
 			expected: map[string]interface{}{
-				"scooter.speed_limit": "25",
-				"scooter.mode":        "eco",
-				"cellular.apn":        "internet.provider.com",
+				"scooter.auto-standby-seconds": "300",
+				"scooter.enable-horn":          "true",
+				"cellular.apn":                 "internet.lebara.de",
 			},
 		},
 		{
-			name: "convert custom sections",
+			name: "convert top-level fields",
 			config: &Config{
+				Fields: map[string]interface{}{
+					"version": "1",
+				},
 				Sections: map[string]map[string]interface{}{
-					"custom": {
-						"setting1": "value1",
-					},
-					"another": {
-						"setting2": "value2",
+					"scooter": {
+						"brake-hibernation": "true",
 					},
 				},
 			},
 			expected: map[string]interface{}{
-				"custom.setting1":  "value1",
-				"another.setting2": "value2",
+				"version":                   "1",
+				"scooter.brake-hibernation": "true",
 			},
 		},
 		{
-			name: "handle empty config",
+			name: "empty config",
 			config: &Config{
 				Sections: map[string]map[string]interface{}{},
 			},
 			expected: map[string]interface{}{},
 		},
 		{
-			name: "handle nested dots in keys",
+			name: "keys with dots in section key name",
 			config: &Config{
 				Sections: map[string]map[string]interface{}{
 					"scooter": {
@@ -180,24 +185,23 @@ func TestToRedisFields(t *testing.T) {
 }
 
 func TestParseRedisSettingsRoundTrip(t *testing.T) {
-	// Test that parsing and converting back produces the same result
 	input := map[string]string{
-		"scooter.speed_limit": "25",
-		"scooter.mode":        "eco",
-		"cellular.apn":        "internet.provider.com",
-		"custom.setting":      "custom_value",
+		"scooter.auto-standby-seconds": "300",
+		"scooter.brake-hibernation":    "true",
+		"cellular.apn":                 "internet.lebara.de",
+		"engine-ecu.mode":              "normal",
+		"version":                      "1",
 	}
 
 	config := ParseRedisSettings(input)
 	output := config.ToRedisFields()
 
-	// Convert output back to map[string]string for comparison
 	outputStr := make(map[string]string)
 	for k, v := range output {
 		outputStr[k] = v.(string)
 	}
 
 	if !reflect.DeepEqual(input, outputStr) {
-		t.Errorf("Round-trip conversion failed. Input: %v, Output: %v", input, outputStr)
+		t.Errorf("round-trip failed.\n  input:  %v\n  output: %v", input, outputStr)
 	}
 }

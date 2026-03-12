@@ -12,6 +12,26 @@ import (
 	"github.com/librescoot/settings-service/internal/redis"
 )
 
+var knownSections = map[string]bool{
+	"scooter":    true,
+	"cellular":   true,
+	"updates":    true,
+	"dashboard":  true,
+	"alarm":      true,
+	"engine-ecu": true,
+}
+
+func warnUnknown(cfg *config.Config) {
+	for section := range cfg.Sections {
+		if !knownSections[section] {
+			log.Printf("warning: unknown settings section %q", section)
+		}
+	}
+	for key := range cfg.Fields {
+		log.Printf("warning: unknown top-level setting %q", key)
+	}
+}
+
 type SettingsService struct {
 	redisClient *redis.Client
 	ctx         context.Context
@@ -54,6 +74,8 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 		return err
 	}
+
+	warnUnknown(cfg)
 
 	// Atomically replace all settings in Redis (flush + set in one pipeline)
 	fields := cfg.ToRedisFields()
@@ -98,8 +120,10 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		log.Printf("  %s = %s", k, v)
 	}
 
-	// Parse settings and save to file
 	cfg := config.ParseRedisSettings(settings)
+	warnUnknown(cfg)
+
+	// Parse settings and save to file
 	if err := config.SaveToFile(cfg); err != nil {
 		return err
 	}
