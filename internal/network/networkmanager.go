@@ -63,32 +63,47 @@ func UpdateAPN(apn string) error {
 	lines := strings.Split(string(content), "\n")
 	updated := false
 	inGsmSection := false
+	gsmSectionIdx := -1
 
-	// Update the APN line
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
-		// Check if we're entering the [gsm] section
+
 		if trimmed == "[gsm]" {
 			inGsmSection = true
+			gsmSectionIdx = i
 			continue
 		}
-		
-		// Check if we're leaving the [gsm] section
+
 		if inGsmSection && strings.HasPrefix(trimmed, "[") {
+			if !updated {
+				// [gsm] section exists but has no apn= line; insert before this section header
+				newLine := fmt.Sprintf("apn=%s", apn)
+				lines = append(lines[:i], append([]string{newLine}, lines[i:]...)...)
+				updated = true
+			}
 			inGsmSection = false
 			continue
 		}
-		
-		// Update the APN line if we're in the [gsm] section
+
 		if inGsmSection && strings.HasPrefix(trimmed, "apn=") {
 			lines[i] = fmt.Sprintf("apn=%s", apn)
 			updated = true
 		}
 	}
 
+	// If we reached EOF while still in the [gsm] section without finding apn=
+	if inGsmSection && !updated {
+		lines = append(lines, fmt.Sprintf("apn=%s", apn))
+		updated = true
+	}
+
+	// No [gsm] section at all — append one
+	if gsmSectionIdx == -1 {
+		lines = append(lines, "", "[gsm]", fmt.Sprintf("apn=%s", apn))
+		updated = true
+	}
+
 	if !updated {
-		log.Printf("APN line not found in NetworkManager connection file")
 		return nil
 	}
 
