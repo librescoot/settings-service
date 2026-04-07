@@ -33,7 +33,7 @@
     "type": "bool",
     "description": "Trigger alarm on unauthorized seatbox opening",
     "label": "Seatbox Alarm Trigger",
-    "user-visible": true,
+    "user-visible": false,
     "service": "alarm-service",
     "default": true,
     "example": true
@@ -42,7 +42,7 @@
     "type": "bool",
     "description": "Enable hair trigger mode (immediate short alarm on first motion)",
     "label": "Hair Trigger",
-    "user-visible": true,
+    "user-visible": false,
     "service": "alarm-service",
     "default": false,
     "example": true
@@ -51,7 +51,7 @@
     "type": "int",
     "description": "Duration in seconds for hair trigger alarm",
     "label": "Hair Trigger Duration",
-    "user-visible": true,
+    "user-visible": false,
     "service": "alarm-service",
     "default": 3,
     "unit": "seconds",
@@ -63,7 +63,7 @@
     "type": "int",
     "description": "Level 1 cooldown duration in seconds",
     "label": "L1 Cooldown Duration",
-    "user-visible": true,
+    "user-visible": false,
     "service": "alarm-service",
     "default": 15,
     "unit": "seconds",
@@ -75,7 +75,7 @@
     "type": "bool",
     "description": "Ignore seatbox open and always keep batteries active",
     "label": "Battery Ignores Seatbox",
-    "user-visible": true,
+    "user-visible": false,
     "service": "battery-service",
     "default": false,
     "example": false
@@ -115,7 +115,7 @@
     "type": "int",
     "description": "Auto-lock timeout when parked in seconds (0=disabled)",
     "label": "Auto Standby Timeout",
-    "user-visible": true,
+    "user-visible": false,
     "service": "vehicle-service",
     "default": 0,
     "unit": "seconds",
@@ -126,12 +126,18 @@
     "type": "enum",
     "description": "Enable brake lever hibernation",
     "label": "Brake Hibernation",
-    "user-visible": true,
+    "user-visible": false,
     "service": "vehicle-service",
     "default": "enabled",
     "values": [
-      { "value": "enabled", "label": "Enabled" },
-      { "value": "disabled", "label": "Disabled" }
+      {
+        "value": "enabled",
+        "label": "Enabled"
+      },
+      {
+        "value": "disabled",
+        "label": "Disabled"
+      }
     ],
     "example": "enabled"
   },
@@ -139,13 +145,22 @@
     "type": "enum",
     "description": "Horn enable mode",
     "label": "Horn",
-    "user-visible": true,
+    "user-visible": false,
     "service": "vehicle-service",
     "default": "true",
     "values": [
-      { "value": "true", "label": "Always" },
-      { "value": "false", "label": "Disabled" },
-      { "value": "in-drive", "label": "In Drive Only" }
+      {
+        "value": "true",
+        "label": "Always"
+      },
+      {
+        "value": "false",
+        "label": "Disabled"
+      },
+      {
+        "value": "in-drive",
+        "label": "In Drive Only"
+      }
     ],
     "example": "in-drive"
   },
@@ -157,8 +172,14 @@
     "service": "update-service",
     "default": "delta",
     "values": [
-      { "value": "delta", "label": "Delta" },
-      { "value": "full", "label": "Full" }
+      {
+        "value": "delta",
+        "label": "Delta"
+      },
+      {
+        "value": "full",
+        "label": "Full"
+      }
     ],
     "example": "full"
   },
@@ -170,9 +191,18 @@
     "service": "update-service",
     "default": "nightly",
     "values": [
-      { "value": "stable", "label": "Stable" },
-      { "value": "testing", "label": "Testing" },
-      { "value": "nightly", "label": "Nightly" }
+      {
+        "value": "stable",
+        "label": "Stable"
+      },
+      {
+        "value": "testing",
+        "label": "Testing"
+      },
+      {
+        "value": "nightly",
+        "label": "Nightly"
+      }
     ],
     "example": "stable"
   },
@@ -229,8 +259,14 @@
     "service": "update-service",
     "default": "delta",
     "values": [
-      { "value": "delta", "label": "Delta" },
-      { "value": "full", "label": "Full" }
+      {
+        "value": "delta",
+        "label": "Delta"
+      },
+      {
+        "value": "full",
+        "label": "Full"
+      }
     ],
     "example": "full"
   },
@@ -242,9 +278,18 @@
     "service": "update-service",
     "default": "nightly",
     "values": [
-      { "value": "stable", "label": "Stable" },
-      { "value": "testing", "label": "Testing" },
-      { "value": "nightly", "label": "Nightly" }
+      {
+        "value": "stable",
+        "label": "Stable"
+      },
+      {
+        "value": "testing",
+        "label": "Testing"
+      },
+      {
+        "value": "nightly",
+        "label": "Nightly"
+      }
     ],
     "example": "stable"
   },
@@ -300,8 +345,14 @@
     "service": "dbc-dispatcher",
     "default": "scootui-qt",
     "values": [
-      { "value": "scootui-qt", "label": "ScootUI (Qt)" },
-      { "value": "scootui-tui", "label": "ScootUI (TUI)" }
+      {
+        "value": "scootui-qt",
+        "label": "ScootUI (Qt)"
+      },
+      {
+        "value": "scootui-tui",
+        "label": "ScootUI (TUI)"
+      }
     ],
     "example": "scootui-tui"
   },
@@ -309,7 +360,7 @@
     "type": "bool",
     "description": "Show raw uncorrected speed from ECU",
     "label": "Show Raw Speed",
-    "user-visible": true,
+    "user-visible": false,
     "service": "scootui",
     "default": false,
     "example": true
@@ -322,8 +373,14 @@
     "service": "scootui",
     "default": "always",
     "values": [
-      { "value": "always", "label": "Always" },
-      { "value": "never", "label": "Never" }
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
     ],
     "example": "always"
   },
@@ -335,10 +392,22 @@
     "service": "scootui",
     "default": "error",
     "values": [
-      { "value": "always", "label": "Always" },
-      { "value": "active-or-error", "label": "Active or Error" },
-      { "value": "error", "label": "Error Only" },
-      { "value": "never", "label": "Never" }
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "active-or-error",
+        "label": "Active or Error"
+      },
+      {
+        "value": "error",
+        "label": "Error Only"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
     ],
     "example": "active-or-error"
   },
@@ -350,10 +419,22 @@
     "service": "scootui",
     "default": "active-or-error",
     "values": [
-      { "value": "always", "label": "Always" },
-      { "value": "active-or-error", "label": "Active or Error" },
-      { "value": "error", "label": "Error Only" },
-      { "value": "never", "label": "Never" }
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "active-or-error",
+        "label": "Active or Error"
+      },
+      {
+        "value": "error",
+        "label": "Error Only"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
     ],
     "example": "always"
   },
@@ -365,10 +446,22 @@
     "service": "scootui",
     "default": "error",
     "values": [
-      { "value": "always", "label": "Always" },
-      { "value": "active-or-error", "label": "Active or Error" },
-      { "value": "error", "label": "Error Only" },
-      { "value": "never", "label": "Never" }
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "active-or-error",
+        "label": "Active or Error"
+      },
+      {
+        "value": "error",
+        "label": "Error Only"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
     ],
     "example": "never"
   },
@@ -380,10 +473,22 @@
     "service": "scootui",
     "default": "always",
     "values": [
-      { "value": "always", "label": "Always" },
-      { "value": "active-or-error", "label": "Active or Error" },
-      { "value": "error", "label": "Error Only" },
-      { "value": "never", "label": "Never" }
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "active-or-error",
+        "label": "Active or Error"
+      },
+      {
+        "value": "error",
+        "label": "Error Only"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
     ],
     "example": "always"
   },
@@ -395,8 +500,14 @@
     "service": "scootui",
     "default": "percentage",
     "values": [
-      { "value": "percentage", "label": "Percentage" },
-      { "value": "range", "label": "Range" }
+      {
+        "value": "percentage",
+        "label": "Percentage"
+      },
+      {
+        "value": "range",
+        "label": "Range"
+      }
     ],
     "example": "range"
   },
@@ -408,8 +519,14 @@
     "service": "scootui",
     "default": "offline",
     "values": [
-      { "value": "online", "label": "Online" },
-      { "value": "offline", "label": "Offline" }
+      {
+        "value": "online",
+        "label": "Online"
+      },
+      {
+        "value": "offline",
+        "label": "Offline"
+      }
     ],
     "example": "online"
   },
@@ -421,8 +538,14 @@
     "service": "scootui",
     "default": "vector",
     "values": [
-      { "value": "vector", "label": "Vector" },
-      { "value": "raster", "label": "Raster" }
+      {
+        "value": "vector",
+        "label": "Vector"
+      },
+      {
+        "value": "raster",
+        "label": "Raster"
+      }
     ],
     "example": "raster"
   },
@@ -434,9 +557,18 @@
     "service": "scootui",
     "default": "dark",
     "values": [
-      { "value": "light", "label": "Light" },
-      { "value": "dark", "label": "Dark" },
-      { "value": "auto", "label": "Auto" }
+      {
+        "value": "light",
+        "label": "Light"
+      },
+      {
+        "value": "dark",
+        "label": "Dark"
+      },
+      {
+        "value": "auto",
+        "label": "Auto"
+      }
     ],
     "example": "auto"
   },
@@ -448,8 +580,14 @@
     "service": "scootui",
     "default": "speedometer",
     "values": [
-      { "value": "speedometer", "label": "Speedometer" },
-      { "value": "navigation", "label": "Navigation" }
+      {
+        "value": "speedometer",
+        "label": "Speedometer"
+      },
+      {
+        "value": "navigation",
+        "label": "Navigation"
+      }
     ],
     "example": "navigation"
   },
@@ -470,8 +608,14 @@
     "service": "scootui",
     "default": "kw",
     "values": [
-      { "value": "kw", "label": "Kilowatts" },
-      { "value": "amps", "label": "Amps" }
+      {
+        "value": "kw",
+        "label": "Kilowatts"
+      },
+      {
+        "value": "amps",
+        "label": "Amps"
+      }
     ],
     "example": "amps"
   },
@@ -492,8 +636,14 @@
     "service": "scootui",
     "default": "icon",
     "values": [
-      { "value": "icon", "label": "Icon" },
-      { "value": "overlay", "label": "Overlay" }
+      {
+        "value": "icon",
+        "label": "Icon"
+      },
+      {
+        "value": "overlay",
+        "label": "Overlay"
+      }
     ],
     "example": "overlay"
   },
@@ -519,7 +669,7 @@
     "type": "bool",
     "description": "Enable motor boost mode",
     "label": "Boost Mode",
-    "user-visible": true,
+    "user-visible": false,
     "service": "ecu-service",
     "default": false,
     "example": true
@@ -528,12 +678,18 @@
     "type": "enum",
     "description": "Kinetic energy recovery system (KERS)",
     "label": "KERS",
-    "user-visible": true,
+    "user-visible": false,
     "service": "ecu-service",
     "default": "enabled",
     "values": [
-      { "value": "enabled", "label": "Enabled" },
-      { "value": "disabled", "label": "Disabled" }
+      {
+        "value": "enabled",
+        "label": "Enabled"
+      },
+      {
+        "value": "disabled",
+        "label": "Disabled"
+      }
     ],
     "example": "disabled"
   },
@@ -541,7 +697,7 @@
     "type": "int",
     "description": "KERS regeneration current",
     "label": "KERS Power",
-    "user-visible": true,
+    "user-visible": false,
     "service": "ecu-service",
     "unit": "mA",
     "min": 0,
@@ -552,7 +708,7 @@
     "type": "int",
     "description": "KERS regeneration current when both batteries are active",
     "label": "KERS Power (Dual Battery)",
-    "user-visible": true,
+    "user-visible": false,
     "service": "ecu-service",
     "unit": "mA",
     "min": 0,
