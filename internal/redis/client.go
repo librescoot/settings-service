@@ -10,6 +10,7 @@ import (
 const (
 	SettingsKey     = "settings"
 	SettingsChannel = "settings"
+	SchemaKey       = "settings:schema"
 )
 
 type Client struct {
@@ -80,6 +81,11 @@ func (c *Client) ReplaceSettings(fields map[string]interface{}) error {
 // WatchChannel returns the pubsub channel for monitoring updates
 func (c *Client) WatchChannel() <-chan *redis.Message {
 	return c.pubsub.Channel()
+}
+
+// SetKey sets a plain string key in Redis.
+func (c *Client) SetKey(key, value string) error {
+	return c.client.Set(c.ctx, key, value, 0).Err()
 }
 
 // Close cleanly shuts down the Redis connections

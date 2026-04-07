@@ -1,0 +1,602 @@
+{
+  "alarm.enabled": {
+    "type": "bool",
+    "description": "Enable or disable the alarm system",
+    "label": "Alarm",
+    "user-visible": true,
+    "service": "alarm-service",
+    "default": false,
+    "example": true
+  },
+  "alarm.honk": {
+    "type": "bool",
+    "description": "Enable horn during alarm trigger",
+    "label": "Alarm Horn",
+    "user-visible": true,
+    "service": "alarm-service",
+    "default": false,
+    "example": true
+  },
+  "alarm.duration": {
+    "type": "int",
+    "description": "Duration in seconds for alarm sound",
+    "label": "Alarm Duration",
+    "user-visible": true,
+    "service": "alarm-service",
+    "default": 60,
+    "unit": "seconds",
+    "min": 0,
+    "max": 300,
+    "example": 60
+  },
+  "alarm.seatbox-trigger": {
+    "type": "bool",
+    "description": "Trigger alarm on unauthorized seatbox opening",
+    "label": "Seatbox Alarm Trigger",
+    "user-visible": true,
+    "service": "alarm-service",
+    "default": true,
+    "example": true
+  },
+  "alarm.hairtrigger": {
+    "type": "bool",
+    "description": "Enable hair trigger mode (immediate short alarm on first motion)",
+    "label": "Hair Trigger",
+    "user-visible": true,
+    "service": "alarm-service",
+    "default": false,
+    "example": true
+  },
+  "alarm.hairtrigger-duration": {
+    "type": "int",
+    "description": "Duration in seconds for hair trigger alarm",
+    "label": "Hair Trigger Duration",
+    "user-visible": true,
+    "service": "alarm-service",
+    "default": 3,
+    "unit": "seconds",
+    "min": 1,
+    "max": 30,
+    "example": 3
+  },
+  "alarm.l1-cooldown": {
+    "type": "int",
+    "description": "Level 1 cooldown duration in seconds",
+    "label": "L1 Cooldown Duration",
+    "user-visible": true,
+    "service": "alarm-service",
+    "default": 15,
+    "unit": "seconds",
+    "min": 1,
+    "max": 60,
+    "example": 15
+  },
+  "scooter.battery-ignores-seatbox": {
+    "type": "bool",
+    "description": "Ignore seatbox open and always keep batteries active",
+    "label": "Battery Ignores Seatbox",
+    "user-visible": true,
+    "service": "battery-service",
+    "default": false,
+    "example": false
+  },
+  "scooter.dual-battery": {
+    "type": "bool",
+    "description": "Enable dual battery mode (battery 1 active instead of idle)",
+    "label": "Dual Battery Mode",
+    "user-visible": true,
+    "service": "battery-service",
+    "default": false,
+    "example": true
+  },
+  "scooter.max-voltage-delta": {
+    "type": "int",
+    "description": "Maximum voltage delta between batteries for dual battery activation (0 to disable)",
+    "label": "Max Battery Voltage Delta",
+    "user-visible": false,
+    "service": "battery-service",
+    "default": 1000,
+    "unit": "mV",
+    "min": 0,
+    "example": 1000
+  },
+  "hibernation-timer": {
+    "type": "int",
+    "description": "Hibernation timeout in seconds",
+    "label": "Hibernation Timer",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": 432000,
+    "unit": "seconds",
+    "min": 0,
+    "example": 432000
+  },
+  "scooter.auto-standby-seconds": {
+    "type": "int",
+    "description": "Auto-lock timeout when parked in seconds (0=disabled)",
+    "label": "Auto Standby Timeout",
+    "user-visible": true,
+    "service": "vehicle-service",
+    "default": 0,
+    "unit": "seconds",
+    "min": 0,
+    "example": 300
+  },
+  "scooter.brake-hibernation": {
+    "type": "enum",
+    "description": "Enable brake lever hibernation",
+    "label": "Brake Hibernation",
+    "user-visible": true,
+    "service": "vehicle-service",
+    "default": "enabled",
+    "values": [
+      { "value": "enabled", "label": "Enabled" },
+      { "value": "disabled", "label": "Disabled" }
+    ],
+    "example": "enabled"
+  },
+  "scooter.enable-horn": {
+    "type": "enum",
+    "description": "Horn enable mode",
+    "label": "Horn",
+    "user-visible": true,
+    "service": "vehicle-service",
+    "default": "true",
+    "values": [
+      { "value": "true", "label": "Always" },
+      { "value": "false", "label": "Disabled" },
+      { "value": "in-drive", "label": "In Drive Only" }
+    ],
+    "example": "in-drive"
+  },
+  "updates.mdb.method": {
+    "type": "enum",
+    "description": "Update method for MDB",
+    "label": "MDB Update Method",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "delta",
+    "values": [
+      { "value": "delta", "label": "Delta" },
+      { "value": "full", "label": "Full" }
+    ],
+    "example": "full"
+  },
+  "updates.mdb.channel": {
+    "type": "enum",
+    "description": "Release channel for MDB",
+    "label": "MDB Release Channel",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "nightly",
+    "values": [
+      { "value": "stable", "label": "Stable" },
+      { "value": "testing", "label": "Testing" },
+      { "value": "nightly", "label": "Nightly" }
+    ],
+    "example": "stable"
+  },
+  "updates.mdb.check-interval": {
+    "type": "duration",
+    "description": "Time between update checks for MDB (0 to disable)",
+    "label": "MDB Update Check Interval",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "6h",
+    "min": 0,
+    "example": "12h"
+  },
+  "updates.mdb.last-check-time": {
+    "type": "string",
+    "description": "Last time MDB checked for updates (ISO8601 timestamp)",
+    "label": "MDB Last Update Check",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.mdb.github-releases-url": {
+    "type": "url",
+    "description": "GitHub Releases API endpoint for MDB",
+    "label": "MDB Releases URL",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "https://api.github.com/repos/librescoot/librescoot/releases",
+    "example": "https://api.github.com/repos/librescoot/librescoot/releases"
+  },
+  "updates.mdb.dry-run": {
+    "type": "bool",
+    "description": "Enable dry-run mode for MDB updates (no reboot)",
+    "label": "MDB Update Dry Run",
+    "user-visible": false,
+    "service": "update-service",
+    "default": false,
+    "example": true
+  },
+  "updates.dbc.method": {
+    "type": "enum",
+    "description": "Update method for DBC",
+    "label": "DBC Update Method",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "delta",
+    "values": [
+      { "value": "delta", "label": "Delta" },
+      { "value": "full", "label": "Full" }
+    ],
+    "example": "full"
+  },
+  "updates.dbc.channel": {
+    "type": "enum",
+    "description": "Release channel for DBC",
+    "label": "DBC Release Channel",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "nightly",
+    "values": [
+      { "value": "stable", "label": "Stable" },
+      { "value": "testing", "label": "Testing" },
+      { "value": "nightly", "label": "Nightly" }
+    ],
+    "example": "stable"
+  },
+  "updates.dbc.check-interval": {
+    "type": "duration",
+    "description": "Time between update checks for DBC (0 to disable)",
+    "label": "DBC Update Check Interval",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "6h",
+    "min": 0,
+    "example": "12h"
+  },
+  "updates.dbc.last-check-time": {
+    "type": "string",
+    "description": "Last time DBC checked for updates (ISO8601 timestamp)",
+    "label": "DBC Last Update Check",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.dbc.github-releases-url": {
+    "type": "url",
+    "description": "GitHub Releases API endpoint for DBC",
+    "label": "DBC Releases URL",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "https://api.github.com/repos/librescoot/librescoot/releases",
+    "example": "https://api.github.com/repos/librescoot/librescoot/releases"
+  },
+  "updates.dbc.dry-run": {
+    "type": "bool",
+    "description": "Enable dry-run mode for DBC updates (no reboot)",
+    "label": "DBC Update Dry Run",
+    "user-visible": false,
+    "service": "update-service",
+    "default": false,
+    "example": true
+  },
+  "cellular.apn": {
+    "type": "string",
+    "description": "Cellular APN string",
+    "label": "Cellular APN",
+    "user-visible": false,
+    "service": "modem-service",
+    "example": "internet"
+  },
+  "dashboard.app": {
+    "type": "enum",
+    "description": "Display application to launch on DBC boot",
+    "label": "Dashboard App",
+    "user-visible": false,
+    "service": "dbc-dispatcher",
+    "default": "scootui-qt",
+    "values": [
+      { "value": "scootui-qt", "label": "ScootUI (Qt)" },
+      { "value": "scootui-tui", "label": "ScootUI (TUI)" }
+    ],
+    "example": "scootui-tui"
+  },
+  "dashboard.show-raw-speed": {
+    "type": "bool",
+    "description": "Show raw uncorrected speed from ECU",
+    "label": "Show Raw Speed",
+    "user-visible": true,
+    "service": "scootui",
+    "default": false,
+    "example": true
+  },
+  "dashboard.show-clock": {
+    "type": "enum",
+    "description": "Clock visibility",
+    "label": "Show Clock",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "always",
+    "values": [
+      { "value": "always", "label": "Always" },
+      { "value": "never", "label": "Never" }
+    ],
+    "example": "always"
+  },
+  "dashboard.show-gps": {
+    "type": "enum",
+    "description": "GPS indicator visibility",
+    "label": "GPS Indicator",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "error",
+    "values": [
+      { "value": "always", "label": "Always" },
+      { "value": "active-or-error", "label": "Active or Error" },
+      { "value": "error", "label": "Error Only" },
+      { "value": "never", "label": "Never" }
+    ],
+    "example": "active-or-error"
+  },
+  "dashboard.show-bluetooth": {
+    "type": "enum",
+    "description": "Bluetooth indicator visibility",
+    "label": "Bluetooth Indicator",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "active-or-error",
+    "values": [
+      { "value": "always", "label": "Always" },
+      { "value": "active-or-error", "label": "Active or Error" },
+      { "value": "error", "label": "Error Only" },
+      { "value": "never", "label": "Never" }
+    ],
+    "example": "always"
+  },
+  "dashboard.show-cloud": {
+    "type": "enum",
+    "description": "Cloud indicator visibility",
+    "label": "Cloud Indicator",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "error",
+    "values": [
+      { "value": "always", "label": "Always" },
+      { "value": "active-or-error", "label": "Active or Error" },
+      { "value": "error", "label": "Error Only" },
+      { "value": "never", "label": "Never" }
+    ],
+    "example": "never"
+  },
+  "dashboard.show-internet": {
+    "type": "enum",
+    "description": "Internet indicator visibility",
+    "label": "Internet Indicator",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "always",
+    "values": [
+      { "value": "always", "label": "Always" },
+      { "value": "active-or-error", "label": "Active or Error" },
+      { "value": "error", "label": "Error Only" },
+      { "value": "never", "label": "Never" }
+    ],
+    "example": "always"
+  },
+  "dashboard.battery-display-mode": {
+    "type": "enum",
+    "description": "Battery display mode",
+    "label": "Battery Display",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "percentage",
+    "values": [
+      { "value": "percentage", "label": "Percentage" },
+      { "value": "range", "label": "Range" }
+    ],
+    "example": "range"
+  },
+  "dashboard.map.type": {
+    "type": "enum",
+    "description": "Map tile source",
+    "label": "Map Type",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "offline",
+    "values": [
+      { "value": "online", "label": "Online" },
+      { "value": "offline", "label": "Offline" }
+    ],
+    "example": "online"
+  },
+  "dashboard.map.render-mode": {
+    "type": "enum",
+    "description": "Map rendering mode",
+    "label": "Map Render Mode",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "vector",
+    "values": [
+      { "value": "vector", "label": "Vector" },
+      { "value": "raster", "label": "Raster" }
+    ],
+    "example": "raster"
+  },
+  "dashboard.theme": {
+    "type": "enum",
+    "description": "UI theme",
+    "label": "Theme",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "dark",
+    "values": [
+      { "value": "light", "label": "Light" },
+      { "value": "dark", "label": "Dark" },
+      { "value": "auto", "label": "Auto" }
+    ],
+    "example": "auto"
+  },
+  "dashboard.mode": {
+    "type": "enum",
+    "description": "Default screen mode",
+    "label": "Default Screen",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "speedometer",
+    "values": [
+      { "value": "speedometer", "label": "Speedometer" },
+      { "value": "navigation", "label": "Navigation" }
+    ],
+    "example": "navigation"
+  },
+  "dashboard.valhalla-url": {
+    "type": "url",
+    "description": "Valhalla routing service endpoint",
+    "label": "Valhalla URL",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "http://localhost:8002/",
+    "example": "http://localhost:8002/"
+  },
+  "dashboard.power-display-mode": {
+    "type": "enum",
+    "description": "Power display unit",
+    "label": "Power Display",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "kw",
+    "values": [
+      { "value": "kw", "label": "Kilowatts" },
+      { "value": "amps", "label": "Amps" }
+    ],
+    "example": "amps"
+  },
+  "dashboard.language": {
+    "type": "string",
+    "description": "Dashboard UI language",
+    "label": "Language",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "en",
+    "example": "en"
+  },
+  "dashboard.blinker-style": {
+    "type": "enum",
+    "description": "Blinker indicator style",
+    "label": "Blinker Style",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "icon",
+    "values": [
+      { "value": "icon", "label": "Icon" },
+      { "value": "overlay", "label": "Overlay" }
+    ],
+    "example": "overlay"
+  },
+  "dashboard.maps-available": {
+    "type": "bool",
+    "description": "Whether offline map tiles are available (system-managed)",
+    "label": "Maps Available",
+    "user-visible": false,
+    "service": "scootui",
+    "default": false,
+    "read-only": true
+  },
+  "dashboard.navigation-available": {
+    "type": "bool",
+    "description": "Whether full navigation is available (maps + routing engine, system-managed)",
+    "label": "Navigation Available",
+    "user-visible": false,
+    "service": "scootui",
+    "default": false,
+    "read-only": true
+  },
+  "engine-ecu.boost": {
+    "type": "bool",
+    "description": "Enable motor boost mode",
+    "label": "Boost Mode",
+    "user-visible": true,
+    "service": "ecu-service",
+    "default": false,
+    "example": true
+  },
+  "engine-ecu.kers": {
+    "type": "enum",
+    "description": "Kinetic energy recovery system (KERS)",
+    "label": "KERS",
+    "user-visible": true,
+    "service": "ecu-service",
+    "default": "enabled",
+    "values": [
+      { "value": "enabled", "label": "Enabled" },
+      { "value": "disabled", "label": "Disabled" }
+    ],
+    "example": "disabled"
+  },
+  "engine-ecu.kers-power": {
+    "type": "int",
+    "description": "KERS regeneration current",
+    "label": "KERS Power",
+    "user-visible": true,
+    "service": "ecu-service",
+    "unit": "mA",
+    "min": 0,
+    "max": 65535,
+    "example": 5000
+  },
+  "engine-ecu.kers-power-dual": {
+    "type": "int",
+    "description": "KERS regeneration current when both batteries are active",
+    "label": "KERS Power (Dual Battery)",
+    "user-visible": true,
+    "service": "ecu-service",
+    "unit": "mA",
+    "min": 0,
+    "max": 65535,
+    "example": 15000
+  },
+  "dashboard.saved-locations.0.created-at": {
+    "type": "string",
+    "description": "Creation timestamp",
+    "label": "Saved Location Created At",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "dashboard.saved-locations.0.label": {
+    "type": "string",
+    "description": "Location label",
+    "label": "Saved Location Label",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "Home"
+  },
+  "dashboard.saved-locations.0.last-used-at": {
+    "type": "string",
+    "description": "Last used timestamp",
+    "label": "Saved Location Last Used",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "2025-01-15T12:00:00Z"
+  },
+  "dashboard.saved-locations.0.latitude": {
+    "type": "float",
+    "description": "Latitude",
+    "label": "Saved Location Latitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -90,
+    "max": 90,
+    "example": 52.52
+  },
+  "dashboard.saved-locations.0.longitude": {
+    "type": "float",
+    "description": "Longitude",
+    "label": "Saved Location Longitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -180,
+    "max": 180,
+    "example": 13.405
+  }
+}

@@ -11,17 +11,19 @@ import (
 	"github.com/librescoot/settings-service/internal/config"
 	"github.com/librescoot/settings-service/internal/network"
 	"github.com/librescoot/settings-service/internal/redis"
+	"github.com/librescoot/settings-service/internal/schema"
 )
 
 type SettingsService struct {
 	redisClient *redis.Client
+	schema      *schema.Schema
 	ctx         context.Context
 	cancel      context.CancelFunc
 	mu          sync.Mutex
 }
 
 // New creates a new settings service instance
-func New(redisAddr string) (*SettingsService, error) {
+func New(redisAddr, schemaPath string) (*SettingsService, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	redisClient, err := redis.NewClient(ctx, redisAddr)
@@ -30,8 +32,19 @@ func New(redisAddr string) (*SettingsService, error) {
 		return nil, err
 	}
 
+	var s *schema.Schema
+	if schemaPath != "" {
+		s, err = schema.LoadFile(schemaPath)
+		if err != nil {
+			log.Printf("Warning: failed to load schema: %v (continuing without schema)", err)
+		} else {
+			log.Printf("Loaded schema with %d settings", len(s.Settings))
+		}
+	}
+
 	return &SettingsService{
 		redisClient: redisClient,
+		schema:      s,
 		ctx:         ctx,
 		cancel:      cancel,
 	}, nil
@@ -42,30 +55,48 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Load configuration from file
-	cfg, err := config.LoadFromFile()
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Println("Flushing existing settings in Redis")
-			if err := s.redisClient.FlushSettings(); err != nil {
-				return fmt.Errorf("failed to flush settings: %w", err)
-			}
-			log.Printf("TOML file %s does not exist, Redis settings cleared", config.TomlFilePath)
-			return nil
+	// Start with schema defaults
+	fields := make(map[string]any)
+	if s.schema != nil {
+		for k, v := range s.schema.Defaults() {
+			fields[k] = v
 		}
-		return err
 	}
 
-	// Atomically replace all settings in Redis (flush + set in one pipeline)
-	fields := cfg.ToRedisFields()
+	// Overlay user settings from TOML (user wins)
+	cfg, err := config.LoadFromFile()
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		log.Printf("No %s found, using schema defaults only", config.TomlFilePath)
+	} else {
+		for k, v := range cfg.ToRedisFields() {
+			fields[k] = v
+		}
+	}
+
+	// Atomically replace all settings in Redis
 	if err := s.redisClient.ReplaceSettings(fields); err != nil {
 		return fmt.Errorf("failed to write settings to Redis: %w", err)
 	}
 
-	log.Printf("Loaded %d settings from TOML file to Redis", len(fields))
+	defaultCount := 0
+	if s.schema != nil {
+		defaultCount = len(s.schema.Defaults())
+	}
+	log.Printf("Loaded %d settings to Redis (%d from schema defaults)", len(fields), defaultCount)
 
-	// Check if APN needs to be synchronized on startup
-	if apn, exists := cfg.Cellular["apn"]; exists && apn != "" {
+	// Publish schema to Redis
+	if s.schema != nil {
+		if err := s.redisClient.SetKey(redis.SchemaKey, string(s.schema.Raw)); err != nil {
+			return fmt.Errorf("failed to publish schema to Redis: %w", err)
+		}
+		log.Printf("Published schema to Redis key %q", redis.SchemaKey)
+	}
+
+	// APN sync
+	if apn, ok := fields["cellular.apn"]; ok && apn != "" {
 		currentAPN, err := network.GetCurrentAPN()
 		if err != nil {
 			log.Printf("Error reading current APN: %v", err)
@@ -124,7 +155,7 @@ func (s *SettingsService) WatchSettings() {
 		case msg := <-ch:
 			if msg.Channel == redis.SettingsChannel {
 				log.Printf("Received update notification for field: %s", msg.Payload)
-				
+
 				if err := s.SaveSettingsToTOML(); err != nil {
 					log.Printf("Error saving settings to TOML: %v", err)
 				}

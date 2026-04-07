@@ -22,6 +22,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	settingsFile := flag.String("settings-file", "", "Path to settings TOML file (default: /data/settings.toml)")
 	wgConfigDir := flag.String("wireguard-config-dir", "", "Path to WireGuard config directory (default: /data/wireguard)")
+	schemaPath := flag.String("schema", "/usr/share/settings-service/settings.schema.json", "Path to settings schema file")
 	flag.Parse()
 
 	if *showVersion {
@@ -48,7 +49,7 @@ func main() {
 		redisAddr = "localhost:6379"
 	}
 
-	svc, err := service.New(redisAddr)
+	svc, err := service.New(redisAddr, *schemaPath)
 	if err != nil {
 		log.Fatalf("Failed to create settings service: %v", err)
 	}
