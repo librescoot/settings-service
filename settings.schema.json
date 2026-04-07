@@ -408,7 +408,7 @@
     "type": "enum",
     "description": "Map rendering mode",
     "label": "Map Render Mode",
-    "user-visible": true,
+    "user-visible": false,
     "service": "scootui",
     "default": "vector",
     "values": [
