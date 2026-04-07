@@ -212,6 +212,15 @@
     "default": false,
     "example": true
   },
+  "updates.mdb.orchestrate-dbc": {
+    "type": "bool",
+    "description": "Automatically power on DBC and trigger update checks when a newer DBC release is available",
+    "label": "Orchestrate DBC Updates",
+    "user-visible": false,
+    "service": "update-service",
+    "default": false,
+    "example": true
+  },
   "updates.dbc.method": {
     "type": "enum",
     "description": "Update method for DBC",
