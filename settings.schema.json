@@ -141,6 +141,25 @@
     ],
     "example": "enabled"
   },
+  "scooter.dbc-blinker-led": {
+    "type": "enum",
+    "description": "Blink DBC boot LED in sync with blinkers (green for single, red for hazards)",
+    "label": "DBC Blinker LED",
+    "user-visible": false,
+    "service": "vehicle-service",
+    "default": "disabled",
+    "values": [
+      {
+        "value": "enabled",
+        "label": "Enabled"
+      },
+      {
+        "value": "disabled",
+        "label": "Disabled"
+      }
+    ],
+    "example": "enabled"
+  },
   "scooter.enable-horn": {
     "type": "enum",
     "description": "Horn enable mode",
