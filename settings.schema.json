@@ -243,15 +243,6 @@
     "service": "update-service",
     "example": "2025-01-15T10:30:00Z"
   },
-  "updates.mdb.github-releases-url": {
-    "type": "url",
-    "description": "GitHub Releases API endpoint for MDB",
-    "label": "MDB Releases URL",
-    "user-visible": false,
-    "service": "update-service",
-    "default": "https://api.github.com/repos/librescoot/librescoot/releases",
-    "example": "https://api.github.com/repos/librescoot/librescoot/releases"
-  },
   "updates.mdb.dry-run": {
     "type": "bool",
     "description": "Enable dry-run mode for MDB updates (no reboot)",
@@ -329,15 +320,6 @@
     "user-visible": false,
     "service": "update-service",
     "example": "2025-01-15T10:30:00Z"
-  },
-  "updates.dbc.github-releases-url": {
-    "type": "url",
-    "description": "GitHub Releases API endpoint for DBC",
-    "label": "DBC Releases URL",
-    "user-visible": false,
-    "service": "update-service",
-    "default": "https://api.github.com/repos/librescoot/librescoot/releases",
-    "example": "https://api.github.com/repos/librescoot/librescoot/releases"
   },
   "updates.dbc.dry-run": {
     "type": "bool",
@@ -782,5 +764,23 @@
     "min": -180,
     "max": 180,
     "example": 13.405
+  },
+  "updates.mdb.releases-url": {
+    "type": "url",
+    "description": "Release index base URL for MDB",
+    "label": "MDB Releases URL",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "https://downloads.librescoot.org/releases",
+    "example": "https://downloads.librescoot.org/releases"
+  },
+  "updates.dbc.releases-url": {
+    "type": "url",
+    "description": "Release index base URL for DBC",
+    "label": "DBC Releases URL",
+    "user-visible": false,
+    "service": "update-service",
+    "default": "https://downloads.librescoot.org/releases",
+    "example": "https://downloads.librescoot.org/releases"
   }
 }
