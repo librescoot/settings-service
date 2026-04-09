@@ -183,6 +183,15 @@
     ],
     "example": "in-drive"
   },
+  "scooter.experimental.hop-on": {
+    "type": "bool",
+    "description": "Experimental: show the hop-on / hop-off menu entry and lock screen on the dashboard. Hidden by default.",
+    "label": "Hop-on / hop-off (experimental)",
+    "user-visible": false,
+    "service": "scootui-qt",
+    "default": false,
+    "example": true
+  },
   "updates.mdb.method": {
     "type": "enum",
     "description": "Update method for MDB",
@@ -665,6 +674,15 @@
       }
     ],
     "example": "overlay"
+  },
+  "dashboard.hop-on-combo": {
+    "type": "string",
+    "description": "User-defined hop-on / hop-off unlock combo as pipe-delimited tokens (e.g. 'LB|RB|HORN'). Empty = no combo defined. Managed by the dashboard learning UI.",
+    "label": "Hop-on Combo",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "",
+    "example": "LB|RB|HORN"
   },
   "dashboard.maps-available": {
     "type": "bool",
