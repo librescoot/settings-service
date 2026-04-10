@@ -183,15 +183,6 @@
     ],
     "example": "in-drive"
   },
-  "scooter.experimental.hop-on": {
-    "type": "bool",
-    "description": "Experimental: show the hop-on / hop-off menu entry and lock screen on the dashboard. Hidden by default.",
-    "label": "Hop-on / hop-off (experimental)",
-    "user-visible": false,
-    "service": "scootui-qt",
-    "default": false,
-    "example": true
-  },
   "updates.mdb.method": {
     "type": "enum",
     "description": "Update method for MDB",
