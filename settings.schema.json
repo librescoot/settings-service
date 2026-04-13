@@ -675,6 +675,22 @@
     "default": false,
     "read-only": true
   },
+  "dashboard.maps.check-for-updates": {
+    "type": "bool",
+    "description": "Automatically check for map tile updates (weekly when online)",
+    "label": "Map Update Check",
+    "user-visible": true,
+    "service": "scootui",
+    "default": true
+  },
+  "dashboard.maps.auto-download": {
+    "type": "bool",
+    "description": "Automatically download map updates when available (uses mobile data)",
+    "label": "Auto-download Maps",
+    "user-visible": true,
+    "service": "scootui",
+    "default": false
+  },
   "engine-ecu.boost": {
     "type": "bool",
     "description": "Enable motor boost mode",
