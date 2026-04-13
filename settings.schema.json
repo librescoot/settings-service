@@ -550,6 +550,14 @@
     ],
     "example": "raster"
   },
+  "dashboard.map.traffic-overlay": {
+    "type": "bool",
+    "description": "Show live traffic overlay on the map (requires online tiles)",
+    "label": "Traffic Overlay",
+    "user-visible": true,
+    "service": "scootui",
+    "default": false
+  },
   "dashboard.theme": {
     "type": "enum",
     "description": "UI theme",
