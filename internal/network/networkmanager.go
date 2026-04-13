@@ -28,16 +28,16 @@ func GetCurrentAPN() (string, error) {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		if trimmed == "[gsm]" {
 			inGsmSection = true
 			continue
 		}
-		
+
 		if inGsmSection && strings.HasPrefix(trimmed, "[") {
 			break
 		}
-		
+
 		if inGsmSection && strings.HasPrefix(trimmed, "apn=") {
 			return strings.TrimPrefix(trimmed, "apn="), nil
 		}

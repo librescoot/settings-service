@@ -88,13 +88,13 @@ func main() {
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	done := make(chan bool)
 	go func() {
 		svc.Close()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		log.Println("Settings service stopped gracefully")
