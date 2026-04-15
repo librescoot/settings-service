@@ -141,6 +141,25 @@
     ],
     "example": "enabled"
   },
+  "scooter.usb0-policy": {
+    "type": "enum",
+    "description": "MDB to DBC USB link behavior. always-on keeps usb0 up regardless of dashboard state so installer and diag tools stay reachable. auto brings usb0 down when the scooter is in standby and only needs to be used on units with WWAN as a backup channel.",
+    "label": "USB Link Policy",
+    "user-visible": false,
+    "service": "vehicle-service",
+    "default": "always-on",
+    "values": [
+      {
+        "value": "always-on",
+        "label": "Always On"
+      },
+      {
+        "value": "auto",
+        "label": "Auto (track dashboard)"
+      }
+    ],
+    "example": "auto"
+  },
   "scooter.dbc-blinker-led": {
     "type": "enum",
     "description": "Blink DBC boot LED in sync with blinkers (green for single, red for hazards)",
