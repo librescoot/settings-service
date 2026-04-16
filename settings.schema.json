@@ -111,6 +111,25 @@
     "min": 0,
     "example": 432000
   },
+  "pm.default-state": {
+    "type": "enum",
+    "description": "Default power target state when idle. 'run' keeps the system awake, 'suspend' triggers auto-suspend after the pre-suspend delay.",
+    "label": "Default Power State",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "run",
+    "values": [
+      {
+        "value": "run",
+        "label": "Run (stay awake)"
+      },
+      {
+        "value": "suspend",
+        "label": "Suspend (auto-sleep)"
+      }
+    ],
+    "example": "suspend"
+  },
   "scooter.auto-standby-seconds": {
     "type": "int",
     "description": "Auto-lock timeout when parked in seconds (0=disabled)",
