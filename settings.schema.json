@@ -100,7 +100,7 @@
     "min": 0,
     "example": 1000
   },
-  "hibernation-timer": {
+  "pm.hibernation-timer": {
     "type": "int",
     "description": "Hibernation timeout in seconds",
     "label": "Hibernation Timer",
