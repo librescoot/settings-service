@@ -71,10 +71,10 @@
     "max": 60,
     "example": 15
   },
-  "scooter.battery-ignores-seatbox": {
+  "scooter.battery-keep-active-on-seatbox-open": {
     "type": "bool",
-    "description": "Ignore seatbox open and always keep batteries active",
-    "label": "Battery Ignores Seatbox",
+    "description": "Keep a running battery active when the seatbox opens instead of deactivating it",
+    "label": "Keep Battery Active On Seatbox Open",
     "user-visible": false,
     "service": "battery-service",
     "default": false,
