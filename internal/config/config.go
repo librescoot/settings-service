@@ -89,40 +89,36 @@ func ParseRedisSettings(settings map[string]string) *Config {
 	return config
 }
 
+// flattenSection walks a section map, handling both flat string leaves and
+// nested sub-maps (produced by TOML files that use sub-tables like
+// [dashboard.saved-locations.0]). Emits dotted Redis field names at the leaves.
+func flattenSection(prefix string, m map[string]interface{}, out map[string]interface{}) {
+	for k, v := range m {
+		key := prefix + "." + k
+		if sub, ok := v.(map[string]interface{}); ok {
+			flattenSection(key, sub, out)
+		} else {
+			out[key] = fmt.Sprintf("%v", v)
+		}
+	}
+}
+
 // ToRedisFields converts Config to Redis hash fields
 func (c *Config) ToRedisFields() map[string]interface{} {
 	fields := make(map[string]interface{})
 
-	for key, value := range c.Scooter {
-		fields[fmt.Sprintf("scooter.%s", key)] = fmt.Sprintf("%v", value)
+	sections := map[string]map[string]interface{}{
+		"scooter":    c.Scooter,
+		"cellular":   c.Cellular,
+		"updates":    c.Updates,
+		"dashboard":  c.Dashboard,
+		"alarm":      c.Alarm,
+		"engine-ecu": c.EngineECU,
+		"keycard":    c.Keycard,
+		"pm":         c.PM,
 	}
-
-	for key, value := range c.Cellular {
-		fields[fmt.Sprintf("cellular.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.Updates {
-		fields[fmt.Sprintf("updates.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.Dashboard {
-		fields[fmt.Sprintf("dashboard.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.Alarm {
-		fields[fmt.Sprintf("alarm.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.EngineECU {
-		fields[fmt.Sprintf("engine-ecu.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.Keycard {
-		fields[fmt.Sprintf("keycard.%s", key)] = fmt.Sprintf("%v", value)
-	}
-
-	for key, value := range c.PM {
-		fields[fmt.Sprintf("pm.%s", key)] = fmt.Sprintf("%v", value)
+	for prefix, section := range sections {
+		flattenSection(prefix, section, fields)
 	}
 
 	return fields
