@@ -795,51 +795,46 @@
     "max": 65535,
     "example": 15000
   },
-  "dashboard.saved-locations.0.created-at": {
+  "dashboard.saved-locations.*.created-at": {
     "type": "string",
     "description": "Creation timestamp",
     "label": "Saved Location Created At",
     "user-visible": false,
     "service": "scootui",
-    "pattern": "indexed",
     "example": "2025-01-15T10:30:00Z"
   },
-  "dashboard.saved-locations.0.label": {
+  "dashboard.saved-locations.*.label": {
     "type": "string",
     "description": "Location label",
     "label": "Saved Location Label",
     "user-visible": false,
     "service": "scootui",
-    "pattern": "indexed",
     "example": "Home"
   },
-  "dashboard.saved-locations.0.last-used-at": {
+  "dashboard.saved-locations.*.last-used-at": {
     "type": "string",
     "description": "Last used timestamp",
     "label": "Saved Location Last Used",
     "user-visible": false,
     "service": "scootui",
-    "pattern": "indexed",
     "example": "2025-01-15T12:00:00Z"
   },
-  "dashboard.saved-locations.0.latitude": {
+  "dashboard.saved-locations.*.latitude": {
     "type": "float",
     "description": "Latitude",
     "label": "Saved Location Latitude",
     "user-visible": false,
     "service": "scootui",
-    "pattern": "indexed",
     "min": -90,
     "max": 90,
     "example": 52.52
   },
-  "dashboard.saved-locations.0.longitude": {
+  "dashboard.saved-locations.*.longitude": {
     "type": "float",
     "description": "Longitude",
     "label": "Saved Location Longitude",
     "user-visible": false,
     "service": "scootui",
-    "pattern": "indexed",
     "min": -180,
     "max": 180,
     "example": 13.405

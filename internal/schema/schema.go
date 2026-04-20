@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type EnumValue struct {
@@ -27,20 +28,79 @@ type Setting struct {
 	Pattern     string      `json:"pattern,omitempty"`
 }
 
+// patternSetting is a schema entry whose key contains wildcard segments.
+type patternSetting struct {
+	segments []string
+	setting  Setting
+}
+
 type Schema struct {
+	// Settings holds exact-match entries, keyed by fully-dotted key.
 	Settings map[string]Setting
+	// Patterns holds entries whose key has at least one "*" segment, e.g.
+	// "dashboard.saved-locations.*.latitude". Exact matches in Settings
+	// take precedence over patterns during lookup.
+	Patterns []patternSetting
 	Raw      []byte
 }
 
 func Parse(data []byte) (*Schema, error) {
-	var settings map[string]Setting
-	if err := json.Unmarshal(data, &settings); err != nil {
+	var raw map[string]Setting
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parsing schema: %w", err)
 	}
-	return &Schema{
-		Settings: settings,
+	s := &Schema{
+		Settings: make(map[string]Setting),
 		Raw:      data,
-	}, nil
+	}
+	for key, setting := range raw {
+		segs := strings.Split(key, ".")
+		wildcard := false
+		for _, seg := range segs {
+			if seg == "*" {
+				wildcard = true
+				break
+			}
+		}
+		if wildcard {
+			s.Patterns = append(s.Patterns, patternSetting{segments: segs, setting: setting})
+		} else {
+			s.Settings[key] = setting
+		}
+	}
+	return s, nil
+}
+
+// Lookup finds the Setting matching key, preferring exact matches over patterns.
+func (s *Schema) Lookup(key string) (Setting, bool) {
+	if setting, ok := s.Settings[key]; ok {
+		return setting, true
+	}
+	segs := strings.Split(key, ".")
+	for _, p := range s.Patterns {
+		if matchSegments(p.segments, segs) {
+			return p.setting, true
+		}
+	}
+	return Setting{}, false
+}
+
+// Has reports whether key is covered by the schema (exact or wildcard).
+func (s *Schema) Has(key string) bool {
+	_, ok := s.Lookup(key)
+	return ok
+}
+
+func matchSegments(pattern, key []string) bool {
+	if len(pattern) != len(key) {
+		return false
+	}
+	for i, p := range pattern {
+		if p != "*" && p != key[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func LoadFile(path string) (*Schema, error) {
