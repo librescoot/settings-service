@@ -376,6 +376,14 @@
     "service": "modem-service",
     "example": "internet"
   },
+  "scooter.logserver": {
+    "type": "url",
+    "description": "systemd-journal-remote URL to ship journald entries to (e.g. http://logs.example:19532). Unset or empty disables log shipping.",
+    "label": "Log Server URL",
+    "user-visible": false,
+    "service": "settings-service",
+    "example": "http://logs.example.com:19532"
+  },
   "dashboard.app": {
     "type": "enum",
     "description": "Display application to launch on DBC boot",

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/librescoot/settings-service/internal/config"
+	"github.com/librescoot/settings-service/internal/journalupload"
 	"github.com/librescoot/settings-service/internal/network"
 	"github.com/librescoot/settings-service/internal/redis"
 	"github.com/librescoot/settings-service/internal/schema"
@@ -110,6 +111,14 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 	}
 
+	// journal-upload log server sync. Only act when the key exists; if it's
+	// missing from settings, we leave the service state alone.
+	if logserver, ok := fields["scooter.logserver"]; ok {
+		if err := journalupload.ApplyLogServer(fmt.Sprintf("%v", logserver)); err != nil {
+			log.Printf("Error applying log server on startup: %v", err)
+		}
+	}
+
 	return nil
 }
 
@@ -164,6 +173,10 @@ func (s *SettingsService) WatchSettings() {
 				if msg.Payload == "cellular.apn" {
 					s.updateAPNFromRedis()
 				}
+
+				if msg.Payload == "scooter.logserver" {
+					s.updateLogServerFromRedis()
+				}
 			}
 		case <-s.ctx.Done():
 			return
@@ -185,6 +198,26 @@ func (s *SettingsService) updateAPNFromRedis() {
 		if err := network.UpdateAPN(apn); err != nil {
 			log.Printf("Error updating NetworkManager APN: %v", err)
 		}
+	}
+}
+
+// updateLogServerFromRedis reads scooter.logserver from Redis and
+// reconciles the systemd-journal-upload config + service state. Unset or
+// empty value disables the service.
+func (s *SettingsService) updateLogServerFromRedis() {
+	s.mu.Lock()
+	settings, err := s.redisClient.GetAllSettings()
+	s.mu.Unlock()
+	if err != nil {
+		log.Printf("Error getting settings for log server update: %v", err)
+		return
+	}
+
+	// Missing key returns "" from the map, which ApplyLogServer treats as
+	// "disable the service" — the behavior we want when the field gets
+	// deleted.
+	if err := journalupload.ApplyLogServer(settings["scooter.logserver"]); err != nil {
+		log.Printf("Error applying log server: %v", err)
 	}
 }
 
