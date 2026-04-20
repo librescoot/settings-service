@@ -53,12 +53,14 @@ func GetCurrentLogServer() (string, error) {
 // ApplyLogServer reconciles the journal-upload config and service state
 // with the desired URL.
 //
-//	""         -> stop + disable the service
-//	new URL    -> write config, enable + restart
-//	same URL   -> start if not running, otherwise no-op
+//	""               -> stop + disable the service
+//	config changed   -> write config, enable + restart
+//	config unchanged -> start if not running, otherwise no-op
 //
-// The generated config sets TrustedCertificateFile=- so plain http:// URLs
-// work and any https:// URL with an unknown CA won't fail verification.
+// The generated config sets both ServerKeyFile=- and TrustedCertificateFile=-
+// so plain http:// URLs work and https:// URLs don't fail because
+// journal-upload can't find the default client-cert/private-key pair at
+// /etc/ssl/{private,certs}/journal-upload.pem.
 func ApplyLogServer(desired string) error {
 	desired = strings.TrimSpace(desired)
 
@@ -66,14 +68,17 @@ func ApplyLogServer(desired string) error {
 		return stopAndDisable()
 	}
 
-	current, err := GetCurrentLogServer()
-	if err != nil {
-		return err
+	expected := buildConfig(desired)
+
+	current, err := os.ReadFile(ConfigPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read %s: %w", ConfigPath, err)
 	}
 
-	if current != desired {
-		log.Printf("journal-upload log server changing: %q -> %q", current, desired)
-		if err := writeConfig(desired); err != nil {
+	if string(current) != expected {
+		currentURL, _ := GetCurrentLogServer()
+		log.Printf("journal-upload config updating (url %q -> %q)", currentURL, desired)
+		if err := writeConfigContent(expected); err != nil {
 			return fmt.Errorf("write %s: %w", ConfigPath, err)
 		}
 		return enableAndRestart()
@@ -82,17 +87,21 @@ func ApplyLogServer(desired string) error {
 	if isActive() {
 		return nil
 	}
-	log.Printf("journal-upload log server already configured (%s) but service inactive; starting", desired)
+	log.Printf("journal-upload config unchanged (%s) but service inactive; starting", desired)
 	return enableAndRestart()
 }
 
-func writeConfig(url string) error {
-	// TrustedCertificateFile=- disables TLS certificate verification. It is a
-	// no-op for http:// URLs and lets https:// URLs work without a CA
-	// bundle. We do not write ServerKeyFile/ServerCertificateFile because we
-	// do not use client-cert auth.
-	content := fmt.Sprintf("[Upload]\nURL=%s\nTrustedCertificateFile=-\n", url)
+// buildConfig returns the canonical journal-upload.conf content for a URL.
+// ServerKeyFile=- tells journal-upload to skip loading any client
+// certificate / private key (the compiled-in default paths under
+// /etc/ssl/{private,certs}/journal-upload.pem don't exist on the scooter).
+// TrustedCertificateFile=- disables server-cert verification, letting
+// self-signed or unknown-CA https:// endpoints work without a CA bundle.
+func buildConfig(url string) string {
+	return fmt.Sprintf("[Upload]\nURL=%s\nServerKeyFile=-\nTrustedCertificateFile=-\n", url)
+}
 
+func writeConfigContent(content string) error {
 	return fileutil.AtomicWrite(ConfigPath, 0644, func(f *os.File) error {
 		_, err := f.WriteString(content)
 		return err
