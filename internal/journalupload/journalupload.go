@@ -57,10 +57,12 @@ func GetCurrentLogServer() (string, error) {
 //	config changed   -> write config, enable + restart
 //	config unchanged -> start if not running, otherwise no-op
 //
-// The generated config sets both ServerKeyFile=- and TrustedCertificateFile=-
-// so plain http:// URLs work and https:// URLs don't fail because
-// journal-upload can't find the default client-cert/private-key pair at
-// /etc/ssl/{private,certs}/journal-upload.pem.
+// The generated config sets ServerKeyFile=-, ServerCertificateFile=-,
+// and TrustedCertificateFile=- so plain http:// URLs work and https://
+// URLs don't fail because journal-upload can't find the default
+// client-cert/private-key pair at /etc/ssl/{private,certs}/journal-
+// upload.pem. Both key and cert must be set together or journal-upload
+// refuses to start ("Options --key= and --cert= must be used together.").
 func ApplyLogServer(desired string) error {
 	desired = strings.TrimSpace(desired)
 
@@ -92,13 +94,15 @@ func ApplyLogServer(desired string) error {
 }
 
 // buildConfig returns the canonical journal-upload.conf content for a URL.
-// ServerKeyFile=- tells journal-upload to skip loading any client
-// certificate / private key (the compiled-in default paths under
-// /etc/ssl/{private,certs}/journal-upload.pem don't exist on the scooter).
-// TrustedCertificateFile=- disables server-cert verification, letting
-// self-signed or unknown-CA https:// endpoints work without a CA bundle.
+// ServerKeyFile=- + ServerCertificateFile=- together tell journal-upload
+// to skip loading any client certificate / private key (journal-upload
+// rejects startup if only one of the two is set). The compiled-in default
+// paths under /etc/ssl/{private,certs}/journal-upload.pem don't exist on
+// the scooter. TrustedCertificateFile=- disables server-cert verification,
+// letting self-signed or unknown-CA https:// endpoints work without a CA
+// bundle.
 func buildConfig(url string) string {
-	return fmt.Sprintf("[Upload]\nURL=%s\nServerKeyFile=-\nTrustedCertificateFile=-\n", url)
+	return fmt.Sprintf("[Upload]\nURL=%s\nServerKeyFile=-\nServerCertificateFile=-\nTrustedCertificateFile=-\n", url)
 }
 
 func writeConfigContent(content string) error {
