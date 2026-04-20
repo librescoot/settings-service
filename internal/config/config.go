@@ -12,19 +12,13 @@ import (
 
 var TomlFilePath = "/data/settings.toml"
 
-type Config struct {
-	Scooter   map[string]interface{} `toml:"scooter"`
-	Cellular  map[string]interface{} `toml:"cellular"`
-	Updates   map[string]interface{} `toml:"updates"`
-	Dashboard map[string]interface{} `toml:"dashboard"`
-	Alarm     map[string]interface{} `toml:"alarm"`
-	EngineECU map[string]interface{} `toml:"engine-ecu"`
-	Keycard   map[string]interface{} `toml:"keycard"`
-	PM        map[string]interface{} `toml:"pm"`
-}
+// Config is a generic two-level map: section name -> field name -> value.
+// Values can be strings (for flat leaves) or nested map[string]interface{}
+// (for sub-tables like [dashboard.saved-locations.0]).
+type Config map[string]map[string]interface{}
 
 // LoadFromFile reads the TOML configuration file
-func LoadFromFile() (*Config, error) {
+func LoadFromFile() (Config, error) {
 	if _, err := os.Stat(TomlFilePath); os.IsNotExist(err) {
 		return nil, os.ErrNotExist
 	}
@@ -34,59 +28,44 @@ func LoadFromFile() (*Config, error) {
 		return nil, fmt.Errorf("failed to read TOML file: %w", err)
 	}
 
-	var config Config
-	if err := toml.Unmarshal(data, &config); err != nil {
+	var cfg Config
+	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse TOML file: %w", err)
 	}
 
-	return &config, nil
+	return cfg, nil
 }
 
 // SaveToFile writes the configuration to the TOML file
-func SaveToFile(config *Config) error {
+func SaveToFile(cfg Config) error {
 	if err := os.MkdirAll(filepath.Dir(TomlFilePath), 0755); err != nil {
 		return fmt.Errorf("failed to create settings directory: %w", err)
 	}
 
 	return fileutil.AtomicWrite(TomlFilePath, 0644, func(f *os.File) error {
-		return toml.NewEncoder(f).Encode(config)
+		return toml.NewEncoder(f).Encode(cfg)
 	})
 }
 
-// ParseRedisSettings converts Redis hash fields to Config structure
-func ParseRedisSettings(settings map[string]string) *Config {
-	config := &Config{
-		Scooter:   make(map[string]interface{}),
-		Cellular:  make(map[string]interface{}),
-		Updates:   make(map[string]interface{}),
-		Dashboard: make(map[string]interface{}),
-		Alarm:     make(map[string]interface{}),
-		EngineECU: make(map[string]interface{}),
-		Keycard:   make(map[string]interface{}),
-		PM:        make(map[string]interface{}),
-	}
-
+// ParseRedisSettings converts Redis hash fields to Config structure.
+// Splits field names at the first dot: everything before becomes the top-level
+// section, everything after is kept verbatim as the section's flat key so the
+// TOML encoder emits existing-style quoted dotted keys.
+func ParseRedisSettings(settings map[string]string) Config {
+	cfg := Config{}
 	for field, value := range settings {
-		if strings.HasPrefix(field, "scooter.") {
-			config.Scooter[strings.TrimPrefix(field, "scooter.")] = value
-		} else if strings.HasPrefix(field, "cellular.") {
-			config.Cellular[strings.TrimPrefix(field, "cellular.")] = value
-		} else if strings.HasPrefix(field, "updates.") {
-			config.Updates[strings.TrimPrefix(field, "updates.")] = value
-		} else if strings.HasPrefix(field, "dashboard.") {
-			config.Dashboard[strings.TrimPrefix(field, "dashboard.")] = value
-		} else if strings.HasPrefix(field, "alarm.") {
-			config.Alarm[strings.TrimPrefix(field, "alarm.")] = value
-		} else if strings.HasPrefix(field, "engine-ecu.") {
-			config.EngineECU[strings.TrimPrefix(field, "engine-ecu.")] = value
-		} else if strings.HasPrefix(field, "keycard.") {
-			config.Keycard[strings.TrimPrefix(field, "keycard.")] = value
-		} else if strings.HasPrefix(field, "pm.") {
-			config.PM[strings.TrimPrefix(field, "pm.")] = value
+		dot := strings.IndexByte(field, '.')
+		if dot < 1 {
+			continue
 		}
+		section := field[:dot]
+		key := field[dot+1:]
+		if _, ok := cfg[section]; !ok {
+			cfg[section] = map[string]interface{}{}
+		}
+		cfg[section][key] = value
 	}
-
-	return config
+	return cfg
 }
 
 // flattenSection walks a section map, handling both flat string leaves and
@@ -104,22 +83,10 @@ func flattenSection(prefix string, m map[string]interface{}, out map[string]inte
 }
 
 // ToRedisFields converts Config to Redis hash fields
-func (c *Config) ToRedisFields() map[string]interface{} {
+func (c Config) ToRedisFields() map[string]interface{} {
 	fields := make(map[string]interface{})
-
-	sections := map[string]map[string]interface{}{
-		"scooter":    c.Scooter,
-		"cellular":   c.Cellular,
-		"updates":    c.Updates,
-		"dashboard":  c.Dashboard,
-		"alarm":      c.Alarm,
-		"engine-ecu": c.EngineECU,
-		"keycard":    c.Keycard,
-		"pm":         c.PM,
-	}
-	for prefix, section := range sections {
+	for prefix, section := range c {
 		flattenSection(prefix, section, fields)
 	}
-
 	return fields
 }

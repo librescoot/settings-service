@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/librescoot/settings-service/internal/config"
@@ -137,10 +136,13 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		log.Printf("  %s = %s", k, v)
 	}
 
-	// Log any fields that don't match expected patterns
-	for field := range settings {
-		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") && !strings.HasPrefix(field, "alarm.") && !strings.HasPrefix(field, "engine-ecu.") && !strings.HasPrefix(field, "keycard.") && !strings.HasPrefix(field, "pm.") {
-			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', 'dashboard.', 'alarm.', 'engine-ecu.', 'keycard.', or 'pm.'", field)
+	// Warn about fields that the schema doesn't declare. Only runs when a
+	// schema is loaded; unknown fields are still persisted.
+	if s.schema != nil {
+		for field := range settings {
+			if !s.schema.Has(field) {
+				log.Printf("Warning: field '%s' is not declared in the schema", field)
+			}
 		}
 	}
 
