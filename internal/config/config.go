@@ -53,6 +53,22 @@ func SaveToFile(config *Config) error {
 	})
 }
 
+// setNested walks segments, creating sub-maps as needed, and stores value at the leaf.
+func setNested(m map[string]interface{}, segments []string, value interface{}) {
+	for i, seg := range segments {
+		if i == len(segments)-1 {
+			m[seg] = value
+			return
+		}
+		sub, ok := m[seg].(map[string]interface{})
+		if !ok {
+			sub = make(map[string]interface{})
+			m[seg] = sub
+		}
+		m = sub
+	}
+}
+
 // ParseRedisSettings converts Redis hash fields to Config structure
 func ParseRedisSettings(settings map[string]string) *Config {
 	config := &Config{
@@ -67,23 +83,32 @@ func ParseRedisSettings(settings map[string]string) *Config {
 	}
 
 	for field, value := range settings {
-		if strings.HasPrefix(field, "scooter.") {
-			config.Scooter[strings.TrimPrefix(field, "scooter.")] = value
-		} else if strings.HasPrefix(field, "cellular.") {
-			config.Cellular[strings.TrimPrefix(field, "cellular.")] = value
-		} else if strings.HasPrefix(field, "updates.") {
-			config.Updates[strings.TrimPrefix(field, "updates.")] = value
-		} else if strings.HasPrefix(field, "dashboard.") {
-			config.Dashboard[strings.TrimPrefix(field, "dashboard.")] = value
-		} else if strings.HasPrefix(field, "alarm.") {
-			config.Alarm[strings.TrimPrefix(field, "alarm.")] = value
-		} else if strings.HasPrefix(field, "engine-ecu.") {
-			config.EngineECU[strings.TrimPrefix(field, "engine-ecu.")] = value
-		} else if strings.HasPrefix(field, "keycard.") {
-			config.Keycard[strings.TrimPrefix(field, "keycard.")] = value
-		} else if strings.HasPrefix(field, "pm.") {
-			config.PM[strings.TrimPrefix(field, "pm.")] = value
+		segs := strings.Split(field, ".")
+		if len(segs) < 2 {
+			continue
 		}
+		var section map[string]interface{}
+		switch segs[0] {
+		case "scooter":
+			section = config.Scooter
+		case "cellular":
+			section = config.Cellular
+		case "updates":
+			section = config.Updates
+		case "dashboard":
+			section = config.Dashboard
+		case "alarm":
+			section = config.Alarm
+		case "engine-ecu":
+			section = config.EngineECU
+		case "keycard":
+			section = config.Keycard
+		case "pm":
+			section = config.PM
+		default:
+			continue
+		}
+		setNested(section, segs[1:], value)
 	}
 
 	return config
