@@ -111,12 +111,15 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 	}
 
-	// journal-upload log server sync. Only act when the key exists; if it's
-	// missing from settings, we leave the service state alone.
-	if logserver, ok := fields["scooter.logserver"]; ok {
-		if err := journalupload.ApplyLogServer(fmt.Sprintf("%v", logserver)); err != nil {
-			log.Printf("Error applying log server on startup: %v", err)
-		}
+	// journal-upload log server sync. Missing or empty value disables the
+	// service so a stale /etc/systemd/journal-upload.conf (e.g. the image
+	// default) can't keep shipping to a bogus URL after reboot.
+	logserver := ""
+	if v, ok := fields["scooter.logserver"]; ok && v != nil {
+		logserver = fmt.Sprintf("%v", v)
+	}
+	if err := journalupload.ApplyLogServer(logserver); err != nil {
+		log.Printf("Error applying log server on startup: %v", err)
 	}
 
 	return nil
