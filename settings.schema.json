@@ -183,7 +183,7 @@
     "type": "enum",
     "description": "Blink DBC boot LED in sync with blinkers (green for single, red for hazards)",
     "label": "DBC Blinker LED",
-    "user-visible": false,
+    "user-visible": true,
     "service": "vehicle-service",
     "default": "disabled",
     "values": [
