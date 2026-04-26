@@ -431,6 +431,29 @@
     ],
     "example": "always"
   },
+  "dashboard.show-temperature": {
+    "type": "enum",
+    "description": "Ambient temperature widget visibility (warning = only when below 10 °C)",
+    "label": "Temperature",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "warning",
+    "values": [
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "warning",
+        "label": "Warning Only"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
+    ],
+    "example": "warning"
+  },
   "dashboard.show-gps": {
     "type": "enum",
     "description": "GPS indicator visibility",
