@@ -5,7 +5,7 @@
     "label": "Alarm",
     "user-visible": true,
     "service": "alarm-service",
-    "default": false,
+    "default": true,
     "example": true
   },
   "alarm.honk": {
@@ -106,7 +106,7 @@
     "label": "Hibernation Timer",
     "user-visible": false,
     "service": "pm-service",
-    "default": 432000,
+    "default": 259200,
     "unit": "seconds",
     "min": 0,
     "example": 432000
@@ -136,7 +136,7 @@
     "label": "Auto Standby Timeout",
     "user-visible": false,
     "service": "vehicle-service",
-    "default": 0,
+    "default": 900,
     "unit": "seconds",
     "min": 0,
     "example": 300
@@ -514,7 +514,7 @@
     "label": "Cloud Indicator",
     "user-visible": true,
     "service": "scootui",
-    "default": "error",
+    "default": "never",
     "values": [
       {
         "value": "always",
@@ -541,7 +541,7 @@
     "label": "Internet Indicator",
     "user-visible": true,
     "service": "scootui",
-    "default": "always",
+    "default": "never",
     "values": [
       {
         "value": "always",
@@ -633,7 +633,7 @@
     "label": "Theme",
     "user-visible": true,
     "service": "scootui",
-    "default": "dark",
+    "default": "auto",
     "values": [
       {
         "value": "light",
@@ -758,7 +758,7 @@
     "label": "Map Update Check",
     "user-visible": true,
     "service": "scootui",
-    "default": true
+    "default": false
   },
   "dashboard.maps.auto-download": {
     "type": "bool",
