@@ -376,6 +376,15 @@
     "service": "modem-service",
     "example": "internet"
   },
+  "cellular.sim-pin": {
+    "type": "string",
+    "description": "PIN for SIM unlock and lock-enable (4-8 digits, empty = leave SIM as-is)",
+    "label": "SIM PIN",
+    "user-visible": false,
+    "service": "modem-service",
+    "default": "",
+    "example": "1234"
+  },
   "scooter.logserver": {
     "type": "url",
     "description": "systemd-journal-remote URL to ship journald entries to (e.g. http://logs.example:19532). Unset or empty disables log shipping.",
