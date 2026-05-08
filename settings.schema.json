@@ -246,7 +246,7 @@
     "label": "MDB Release Channel",
     "user-visible": false,
     "service": "update-service",
-    "default": "nightly",
+    "default": null,
     "values": [
       {
         "value": "stable",
@@ -324,7 +324,7 @@
     "label": "DBC Release Channel",
     "user-visible": false,
     "service": "update-service",
-    "default": "nightly",
+    "default": null,
     "values": [
       {
         "value": "stable",
