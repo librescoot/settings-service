@@ -21,6 +21,13 @@ type SettingsService struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	mu          sync.Mutex
+
+	// userSetKeys tracks settings whose value should be persisted to
+	// /data/settings.toml. Keys present in the toml file at load time are
+	// user-set; keys that exist in Redis only because of schema.Defaults()
+	// are not. Runtime HSETs (lsc, bluetooth-service, ...) add their field
+	// to the set when the change notification arrives. Mutated under mu.
+	userSetKeys map[string]struct{}
 }
 
 // New creates a new settings service instance
@@ -48,6 +55,7 @@ func New(redisAddr, schemaPath string) (*SettingsService, error) {
 		schema:      s,
 		ctx:         ctx,
 		cancel:      cancel,
+		userSetKeys: make(map[string]struct{}),
 	}, nil
 }
 
@@ -64,7 +72,10 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 	}
 
-	// Overlay user settings from TOML (user wins)
+	// Overlay user settings from TOML (user wins) and track which keys
+	// are user-set so SaveSettingsToTOML doesn't bake schema defaults
+	// into the toml the next time any setting changes.
+	userSet := make(map[string]struct{})
 	cfg, err := config.LoadFromFile()
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -74,8 +85,10 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	} else {
 		for k, v := range cfg.ToRedisFields() {
 			fields[k] = v
+			userSet[k] = struct{}{}
 		}
 	}
+	s.userSetKeys = userSet
 
 	// Atomically replace all settings in Redis
 	if err := s.redisClient.ReplaceSettings(fields); err != nil {
@@ -125,7 +138,9 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	return nil
 }
 
-// SaveSettingsToTOML saves settings from Redis to TOML file
+// SaveSettingsToTOML saves settings from Redis to TOML file. Only keys
+// recorded as user-set (loaded from toml or HSET at runtime) are persisted;
+// pure schema defaults stay in Redis but never reach disk.
 func (s *SettingsService) SaveSettingsToTOML() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -147,15 +162,36 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		}
 	}
 
-	// Parse settings and save to file
-	cfg := config.ParseRedisSettings(settings)
+	persisted := filterUserSet(settings, s.userSetKeys)
+
+	cfg := config.ParseRedisSettings(persisted)
 	if err := config.SaveToFile(cfg); err != nil {
 		return err
 	}
 
-	log.Printf("Saved %d settings to TOML file", len(settings))
+	log.Printf("Saved %d settings to TOML file (filtered from %d in Redis)", len(persisted), len(settings))
 
 	return nil
+}
+
+// filterUserSet returns only the entries from settings whose keys are in
+// userSetKeys. Used to keep schema defaults out of the persisted toml.
+func filterUserSet(settings map[string]string, userSetKeys map[string]struct{}) map[string]string {
+	out := make(map[string]string, len(userSetKeys))
+	for k := range userSetKeys {
+		if v, ok := settings[k]; ok {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// markUserSet records a Redis field as user-set, so it will be included on
+// the next SaveSettingsToTOML.
+func (s *SettingsService) markUserSet(field string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.userSetKeys[field] = struct{}{}
 }
 
 // WatchSettings monitors Redis for changes and updates TOML file
@@ -167,6 +203,14 @@ func (s *SettingsService) WatchSettings() {
 		case msg := <-ch:
 			if msg.Channel == redis.SettingsChannel {
 				log.Printf("Received update notification for field: %s", msg.Payload)
+
+				// "reload" comes from our own ReplaceSettings during
+				// LoadSettingsFromTOML and is not a field name. Field-name
+				// payloads come from runtime HSETs (lsc, bluetooth-service,
+				// etc.) and count as user-set.
+				if msg.Payload != "" && msg.Payload != "reload" {
+					s.markUserSet(msg.Payload)
+				}
 
 				if err := s.SaveSettingsToTOML(); err != nil {
 					log.Printf("Error saving settings to TOML: %v", err)
