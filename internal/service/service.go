@@ -59,10 +59,21 @@ func New(redisAddr, schemaPath string) (*SettingsService, error) {
 	}, nil
 }
 
-// LoadSettingsFromTOML loads settings from TOML file to Redis
+// LoadSettingsFromTOML loads settings from TOML file to Redis. Returns
+// any error from disk/Redis I/O. If transient keys were stripped from
+// toml, the caller (after releasing whatever locks it holds) should
+// invoke SaveSettingsToTOML to rewrite the file without them.
 func (s *SettingsService) LoadSettingsFromTOML() error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	rewriteToml := false
+	defer func() {
+		s.mu.Unlock()
+		if rewriteToml {
+			if err := s.SaveSettingsToTOML(); err != nil {
+				log.Printf("Error rewriting toml after dropping transient keys: %v", err)
+			}
+		}
+	}()
 
 	// Start with schema defaults
 	fields := make(map[string]any)
@@ -76,6 +87,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	// are user-set so SaveSettingsToTOML doesn't bake schema defaults
 	// into the toml the next time any setting changes.
 	userSet := make(map[string]struct{})
+	var droppedTransient []string
 	cfg, err := config.LoadFromFile()
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -83,13 +95,22 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 		log.Printf("No %s found, using schema defaults only", config.TomlFilePath)
 	} else {
-		applyTomlOverlay(cfg.ToRedisFields(), s.schema, fields, userSet)
+		droppedTransient = applyTomlOverlay(cfg.ToRedisFields(), s.schema, fields, userSet)
 	}
 	s.userSetKeys = userSet
+	rewriteToml = len(droppedTransient) > 0
 
 	// Atomically replace all settings in Redis
 	if err := s.redisClient.ReplaceSettings(fields); err != nil {
 		return fmt.Errorf("failed to write settings to Redis: %w", err)
+	}
+
+	// Redis survives systemctl restarts on this platform, so a previous
+	// service instance can have left transient keys in the hash. Clear
+	// every declared-transient key so the post-load Redis state matches
+	// the invariant "transient values exist only after a runtime HSET".
+	if err := s.redisClient.DeleteSettingsFields(transientKeys(s.schema)); err != nil {
+		log.Printf("Error clearing transient keys from Redis: %v", err)
 	}
 
 	defaultCount := 0
@@ -190,16 +211,35 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 // silently dropped: a stale value in toml (e.g. the legacy
 // updates.{mdb,dbc}.channel default that pushed stable scooters onto
 // nightly) must not be reloaded into Redis or re-persisted by the next
-// SaveSettingsToTOML.
-func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string]any, userSet map[string]struct{}) {
+// SaveSettingsToTOML. Returns the list of transient keys that were
+// dropped so the caller can rewrite the toml without them.
+func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string]any, userSet map[string]struct{}) (droppedTransient []string) {
 	for k, v := range toml {
 		if sch.IsTransient(k) {
 			log.Printf("Ignoring transient key %q from toml", k)
+			droppedTransient = append(droppedTransient, k)
 			continue
 		}
 		fields[k] = v
 		userSet[k] = struct{}{}
 	}
+	return droppedTransient
+}
+
+// transientKeys returns every key declared transient in the schema. Used
+// to defensively clear stale values from Redis on load — necessary
+// because Redis survives systemctl restarts of settings-service.
+func transientKeys(sch *schema.Schema) []string {
+	if sch == nil {
+		return nil
+	}
+	var out []string
+	for k, s := range sch.Settings {
+		if s.Transient {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // filterUserSet returns only the entries from settings whose keys are in

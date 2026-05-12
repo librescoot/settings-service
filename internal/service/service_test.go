@@ -26,7 +26,20 @@ func TestApplyTomlOverlay(t *testing.T) {
 	fields := map[string]any{}
 	userSet := map[string]struct{}{}
 
-	applyTomlOverlay(toml, sch, fields, userSet)
+	dropped := applyTomlOverlay(toml, sch, fields, userSet)
+
+	if len(dropped) != 2 {
+		t.Errorf("dropped count = %d, want 2 (got %v)", len(dropped), dropped)
+	}
+	wantDropped := map[string]struct{}{
+		"updates.mdb.channel": {},
+		"updates.dbc.channel": {},
+	}
+	for _, k := range dropped {
+		if _, ok := wantDropped[k]; !ok {
+			t.Errorf("unexpected dropped key %q", k)
+		}
+	}
 
 	for _, k := range []string{"updates.mdb.channel", "updates.dbc.channel"} {
 		if _, ok := fields[k]; ok {
@@ -53,13 +66,43 @@ func TestApplyTomlOverlay_NilSchema(t *testing.T) {
 	fields := map[string]any{}
 	userSet := map[string]struct{}{}
 
-	applyTomlOverlay(toml, nil, fields, userSet)
+	dropped := applyTomlOverlay(toml, nil, fields, userSet)
+	if len(dropped) != 0 {
+		t.Errorf("nil schema should drop nothing, got %v", dropped)
+	}
 
 	if fields["updates.mdb.channel"] != "nightly" {
 		t.Error("nil schema should preserve legacy persist-everything behavior")
 	}
 	if _, ok := userSet["updates.mdb.channel"]; !ok {
 		t.Error("nil schema should mark every toml key user-set")
+	}
+}
+
+func TestTransientKeys(t *testing.T) {
+	const schemaJSON = `{
+  "alarm.enabled":       {"type": "bool"},
+  "updates.mdb.channel": {"type": "enum", "transient": true},
+  "updates.dbc.channel": {"type": "enum", "transient": true}
+}`
+	sch, err := schema.Parse([]byte(schemaJSON))
+	if err != nil {
+		t.Fatalf("schema.Parse: %v", err)
+	}
+
+	keys := transientKeys(sch)
+	if len(keys) != 2 {
+		t.Fatalf("len = %d, want 2 (got %v)", len(keys), keys)
+	}
+	want := map[string]bool{"updates.mdb.channel": true, "updates.dbc.channel": true}
+	for _, k := range keys {
+		if !want[k] {
+			t.Errorf("unexpected key %q", k)
+		}
+	}
+
+	if got := transientKeys(nil); got != nil {
+		t.Errorf("nil schema = %v, want nil", got)
 	}
 }
 

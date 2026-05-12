@@ -94,6 +94,25 @@ func (c *Client) ReplaceSettings(fields map[string]interface{}) error {
 	return err
 }
 
+// DeleteSettingsFields removes the named fields from the settings hash
+// and publishes a notification per field. Used by LoadSettingsFromTOML to
+// clear transient keys that survived a service restart (Redis isn't
+// restarted alongside settings-service, so the hash can carry stale
+// transient values from the previous instance).
+func (c *Client) DeleteSettingsFields(fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	_, err := c.client.TxPipelined(c.ctx, func(pipe redis.Pipeliner) error {
+		pipe.HDel(c.ctx, SettingsKey, fields...)
+		for _, f := range fields {
+			pipe.Publish(c.ctx, SettingsChannel, f)
+		}
+		return nil
+	})
+	return err
+}
+
 // WatchChannel returns the pubsub channel for monitoring updates
 func (c *Client) WatchChannel() <-chan *redis.Message {
 	return c.pubsub.Channel()
