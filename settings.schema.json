@@ -130,6 +130,56 @@
     ],
     "example": "suspend"
   },
+  "pm.scheduled-hibernate-enabled": {
+    "type": "bool",
+    "description": "Enable scheduled hibernation defined by pm.scheduled-hibernate-cron and pm.scheduled-hibernate-duration",
+    "label": "Scheduled Hibernation",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": false,
+    "example": true
+  },
+  "pm.scheduled-hibernate-cron": {
+    "type": "string",
+    "description": "5-field cron expression (minute hour day-of-month month day-of-week) defining when scheduled hibernation fires. Empty disables.",
+    "label": "Scheduled Hibernation Cron",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "",
+    "example": "0 22 * * *"
+  },
+  "pm.scheduled-hibernate-duration": {
+    "type": "duration",
+    "description": "How long the scheduled hibernation should last. The system wakes at fire-time + this duration (wall-clock target wake time).",
+    "label": "Scheduled Hibernation Duration",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "0s",
+    "min": 0,
+    "example": "8h"
+  },
+  "pm.wake-timer-max-seconds": {
+    "type": "int",
+    "description": "Safety cap on the wake-timer duration sent to the nRF52. Requests above this value are clamped.",
+    "label": "Wake Timer Max",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": 604800,
+    "unit": "seconds",
+    "min": 60,
+    "max": 604800,
+    "example": 604800
+  },
+  "pm.wake-timer-ack-timeout": {
+    "type": "duration",
+    "description": "How long pm-service waits for the nRF52 to confirm a wake-timer was armed before aborting hibernation",
+    "label": "Wake Timer Ack Timeout",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "10s",
+    "min": 0,
+    "example": "10s"
+  },
   "scooter.auto-standby-seconds": {
     "type": "int",
     "description": "Auto-lock timeout when parked in seconds (0=disabled)",
