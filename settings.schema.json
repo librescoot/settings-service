@@ -216,7 +216,7 @@
     "label": "USB Link Policy",
     "user-visible": false,
     "service": "vehicle-service",
-    "default": "always-on",
+    "default": "auto",
     "values": [
       {
         "value": "always-on",
