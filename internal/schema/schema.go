@@ -54,10 +54,18 @@ func LoadFile(path string) (*Schema, error) {
 
 // IsTransient reports whether the named setting is declared transient in
 // the schema. Transient settings live only in Redis: they are never read
-// from or written to /data/settings.toml, and schema defaults for them are
-// not hydrated into Redis at boot. Used for "switch direction" keys (e.g.
-// updates.{mdb,dbc}.channel) where a value should evaporate on the next
-// reboot so services fall back to their own inference.
+// from or written to /data/settings.toml. Schema defaults still hydrate
+// into Redis at boot — the transient flag only governs persistence, not
+// default application. A runtime HSET overrides the default for the
+// current session; the next reboot wipes Redis and the default loads
+// again.
+//
+// Use cases:
+//   - default: null + transient: true → no value at boot, services infer
+//     from elsewhere (e.g. updates.{mdb,dbc}.channel from VERSION_ID).
+//   - default: "x" + transient: true → "x" loads on every boot, runtime
+//     overrides don't survive (e.g. scooter.usb0-policy = "auto" with
+//     "always-on" as a temporary override).
 //
 // Returns false when the schema is nil or the key is unknown — both safe
 // defaults that preserve the legacy persist-everything behavior.
@@ -69,10 +77,15 @@ func (s *Schema) IsTransient(key string) bool {
 	return ok && setting.Transient
 }
 
+// Defaults returns every schema-declared default value. Transient keys
+// are included when they declare a default: transient governs persistence
+// (no toml load/save) but not boot-time hydration into Redis. A transient
+// key with default "auto" gets "auto" on every boot, then runtime HSETs
+// can override it for the session, and the next reboot returns to "auto".
 func (s *Schema) Defaults() map[string]string {
 	defaults := make(map[string]string)
 	for key, setting := range s.Settings {
-		if setting.Default == nil || setting.Transient {
+		if setting.Default == nil {
 			continue
 		}
 		switch v := setting.Default.(type) {

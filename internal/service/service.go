@@ -107,9 +107,16 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 
 	// Redis survives systemctl restarts on this platform, so a previous
 	// service instance can have left transient keys in the hash. Clear
-	// every declared-transient key so the post-load Redis state matches
-	// the invariant "transient values exist only after a runtime HSET".
-	if err := s.redisClient.DeleteSettingsFields(transientKeys(s.schema)); err != nil {
+	// every declared-transient key that we did NOT just write a fresh
+	// value for — keys with a schema default were already populated by
+	// ReplaceSettings and must not be wiped here.
+	var stale []string
+	for _, k := range transientKeys(s.schema) {
+		if _, ok := fields[k]; !ok {
+			stale = append(stale, k)
+		}
+	}
+	if err := s.redisClient.DeleteSettingsFields(stale); err != nil {
 		log.Printf("Error clearing transient keys from Redis: %v", err)
 	}
 

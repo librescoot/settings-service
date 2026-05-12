@@ -178,7 +178,12 @@ func TestTransient(t *testing.T) {
   },
   "updates.mdb.channel": {
     "type": "enum",
-    "default": "nightly",
+    "default": null,
+    "transient": true
+  },
+  "scooter.usb0-policy": {
+    "type": "enum",
+    "default": "auto",
     "transient": true
   }
 }`
@@ -190,6 +195,9 @@ func TestTransient(t *testing.T) {
 
 	if !s.IsTransient("updates.mdb.channel") {
 		t.Error("updates.mdb.channel should be transient")
+	}
+	if !s.IsTransient("scooter.usb0-policy") {
+		t.Error("scooter.usb0-policy should be transient")
 	}
 	if s.IsTransient("alarm.enabled") {
 		t.Error("alarm.enabled should not be transient")
@@ -204,8 +212,15 @@ func TestTransient(t *testing.T) {
 	}
 
 	defaults := s.Defaults()
+
+	// Transient keys without a default are skipped.
 	if _, ok := defaults["updates.mdb.channel"]; ok {
-		t.Error("Defaults() must skip transient keys even when a default is set")
+		t.Error("Defaults() must skip transient keys with no default")
+	}
+	// Transient keys WITH a default are hydrated — that's the whole
+	// point of decoupling the two concerns.
+	if defaults["scooter.usb0-policy"] != "auto" {
+		t.Errorf("Defaults()[scooter.usb0-policy] = %q, want \"auto\" (transient + default should hydrate)", defaults["scooter.usb0-policy"])
 	}
 	if defaults["alarm.enabled"] != "true" {
 		t.Errorf("Defaults() should keep non-transient keys, got %v", defaults)
