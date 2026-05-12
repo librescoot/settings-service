@@ -2,7 +2,66 @@ package service
 
 import (
 	"testing"
+
+	"github.com/librescoot/settings-service/internal/schema"
 )
+
+func TestApplyTomlOverlay(t *testing.T) {
+	const schemaJSON = `{
+  "alarm.enabled":       {"type": "bool", "default": true},
+  "updates.mdb.channel": {"type": "enum", "transient": true},
+  "updates.dbc.channel": {"type": "enum", "transient": true}
+}`
+	sch, err := schema.Parse([]byte(schemaJSON))
+	if err != nil {
+		t.Fatalf("schema.Parse: %v", err)
+	}
+
+	toml := map[string]any{
+		"alarm.enabled":       "true",
+		"updates.mdb.channel": "nightly", // legacy stale value, must be ignored
+		"updates.dbc.channel": "nightly",
+		"scooter.logserver":   "https://example",
+	}
+	fields := map[string]any{}
+	userSet := map[string]struct{}{}
+
+	applyTomlOverlay(toml, sch, fields, userSet)
+
+	for _, k := range []string{"updates.mdb.channel", "updates.dbc.channel"} {
+		if _, ok := fields[k]; ok {
+			t.Errorf("transient key %q should not be loaded into fields", k)
+		}
+		if _, ok := userSet[k]; ok {
+			t.Errorf("transient key %q should not be marked user-set", k)
+		}
+	}
+
+	for _, k := range []string{"alarm.enabled", "scooter.logserver"} {
+		if _, ok := fields[k]; !ok {
+			t.Errorf("persistent key %q should be loaded into fields", k)
+		}
+		if _, ok := userSet[k]; !ok {
+			t.Errorf("persistent key %q should be marked user-set", k)
+		}
+	}
+}
+
+func TestApplyTomlOverlay_NilSchema(t *testing.T) {
+	// No schema = nothing transient = legacy behavior preserved.
+	toml := map[string]any{"updates.mdb.channel": "nightly"}
+	fields := map[string]any{}
+	userSet := map[string]struct{}{}
+
+	applyTomlOverlay(toml, nil, fields, userSet)
+
+	if fields["updates.mdb.channel"] != "nightly" {
+		t.Error("nil schema should preserve legacy persist-everything behavior")
+	}
+	if _, ok := userSet["updates.mdb.channel"]; !ok {
+		t.Error("nil schema should mark every toml key user-set")
+	}
+}
 
 func TestFilterUserSet(t *testing.T) {
 	tests := []struct {

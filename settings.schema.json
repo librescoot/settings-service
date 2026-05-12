@@ -292,11 +292,12 @@
   },
   "updates.mdb.channel": {
     "type": "enum",
-    "description": "Release channel for MDB",
+    "description": "Release channel override for MDB. Transient: lives in Redis only; on reboot update-service falls back to the channel inferred from the installed image.",
     "label": "MDB Release Channel",
     "user-visible": false,
     "service": "update-service",
     "default": null,
+    "transient": true,
     "values": [
       {
         "value": "stable",
@@ -370,11 +371,12 @@
   },
   "updates.dbc.channel": {
     "type": "enum",
-    "description": "Release channel for DBC",
+    "description": "Release channel override for DBC. Transient: lives in Redis only; on reboot update-service falls back to the channel inferred from the installed image.",
     "label": "DBC Release Channel",
     "user-visible": false,
     "service": "update-service",
     "default": null,
+    "transient": true,
     "values": [
       {
         "value": "stable",

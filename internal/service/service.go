@@ -83,10 +83,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 		log.Printf("No %s found, using schema defaults only", config.TomlFilePath)
 	} else {
-		for k, v := range cfg.ToRedisFields() {
-			fields[k] = v
-			userSet[k] = struct{}{}
-		}
+		applyTomlOverlay(cfg.ToRedisFields(), s.schema, fields, userSet)
 	}
 	s.userSetKeys = userSet
 
@@ -188,6 +185,23 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	return nil
 }
 
+// applyTomlOverlay merges toml-loaded fields into the boot-time Redis
+// hash, marking each persisted key as user-set. Transient keys are
+// silently dropped: a stale value in toml (e.g. the legacy
+// updates.{mdb,dbc}.channel default that pushed stable scooters onto
+// nightly) must not be reloaded into Redis or re-persisted by the next
+// SaveSettingsToTOML.
+func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string]any, userSet map[string]struct{}) {
+	for k, v := range toml {
+		if sch.IsTransient(k) {
+			log.Printf("Ignoring transient key %q from toml", k)
+			continue
+		}
+		fields[k] = v
+		userSet[k] = struct{}{}
+	}
+}
+
 // filterUserSet returns only the entries from settings whose keys are in
 // userSetKeys. Used to keep schema defaults out of the persisted toml.
 func filterUserSet(settings map[string]string, userSetKeys map[string]struct{}) map[string]string {
@@ -226,12 +240,19 @@ func (s *SettingsService) WatchSettings() {
 				// either from a runtime HSET (lsc, bluetooth-service, etc.)
 				// or from our own ReplaceSettings (which the Subscribe()
 				// ordering above guarantees we don't see).
-				if msg.Payload != "" {
+				//
+				// Transient keys live only in Redis: don't mark them
+				// user-set and don't rewrite the toml just because one
+				// changed.
+				transient := s.schema.IsTransient(msg.Payload)
+				if msg.Payload != "" && !transient {
 					s.markUserSet(msg.Payload)
 				}
 
-				if err := s.SaveSettingsToTOML(); err != nil {
-					log.Printf("Error saving settings to TOML: %v", err)
+				if !transient {
+					if err := s.SaveSettingsToTOML(); err != nil {
+						log.Printf("Error saving settings to TOML: %v", err)
+					}
 				}
 
 				// Only update NetworkManager if the APN field was changed

@@ -170,6 +170,48 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestTransient(t *testing.T) {
+	const transientJSON = `{
+  "alarm.enabled": {
+    "type": "bool",
+    "default": true
+  },
+  "updates.mdb.channel": {
+    "type": "enum",
+    "default": "nightly",
+    "transient": true
+  }
+}`
+
+	s, err := Parse([]byte(transientJSON))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	if !s.IsTransient("updates.mdb.channel") {
+		t.Error("updates.mdb.channel should be transient")
+	}
+	if s.IsTransient("alarm.enabled") {
+		t.Error("alarm.enabled should not be transient")
+	}
+	if s.IsTransient("does.not.exist") {
+		t.Error("unknown keys should not be transient")
+	}
+
+	var nilSchema *Schema
+	if nilSchema.IsTransient("anything") {
+		t.Error("nil schema should report nothing transient")
+	}
+
+	defaults := s.Defaults()
+	if _, ok := defaults["updates.mdb.channel"]; ok {
+		t.Error("Defaults() must skip transient keys even when a default is set")
+	}
+	if defaults["alarm.enabled"] != "true" {
+		t.Errorf("Defaults() should keep non-transient keys, got %v", defaults)
+	}
+}
+
 func TestRawBytes(t *testing.T) {
 	data := []byte(testJSON)
 	s, err := Parse(data)

@@ -25,6 +25,7 @@ type Setting struct {
 	Example     any         `json:"example,omitempty"`
 	ReadOnly    bool        `json:"read-only,omitempty"`
 	Pattern     string      `json:"pattern,omitempty"`
+	Transient   bool        `json:"transient,omitempty"`
 }
 
 type Schema struct {
@@ -51,10 +52,27 @@ func LoadFile(path string) (*Schema, error) {
 	return Parse(data)
 }
 
+// IsTransient reports whether the named setting is declared transient in
+// the schema. Transient settings live only in Redis: they are never read
+// from or written to /data/settings.toml, and schema defaults for them are
+// not hydrated into Redis at boot. Used for "switch direction" keys (e.g.
+// updates.{mdb,dbc}.channel) where a value should evaporate on the next
+// reboot so services fall back to their own inference.
+//
+// Returns false when the schema is nil or the key is unknown — both safe
+// defaults that preserve the legacy persist-everything behavior.
+func (s *Schema) IsTransient(key string) bool {
+	if s == nil {
+		return false
+	}
+	setting, ok := s.Settings[key]
+	return ok && setting.Transient
+}
+
 func (s *Schema) Defaults() map[string]string {
 	defaults := make(map[string]string)
 	for key, setting := range s.Settings {
-		if setting.Default == nil {
+		if setting.Default == nil || setting.Transient {
 			continue
 		}
 		switch v := setting.Default.(type) {
