@@ -19,7 +19,10 @@ type Client struct {
 	ctx    context.Context
 }
 
-// NewClient creates a new Redis client with pubsub subscription
+// NewClient creates a new Redis client. The pubsub subscription is deferred
+// until Subscribe() is called explicitly, so the initial bulk load in
+// ReplaceSettings can publish per-field notifications without the service's
+// own subscriber treating them as user-initiated changes.
 func NewClient(ctx context.Context, addr string) (*Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
@@ -31,13 +34,17 @@ func NewClient(ctx context.Context, addr string) (*Client, error) {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	pubsub := client.Subscribe(ctx, SettingsChannel)
-
 	return &Client{
 		client: client,
-		pubsub: pubsub,
 		ctx:    ctx,
 	}, nil
+}
+
+// Subscribe opens the pubsub subscription on SettingsChannel. Call this after
+// any startup work that publishes on the channel (e.g. ReplaceSettings), so
+// the service doesn't receive its own bulk-load notifications.
+func (c *Client) Subscribe() {
+	c.pubsub = c.client.Subscribe(c.ctx, SettingsChannel)
 }
 
 // FlushSettings clears all settings from Redis
@@ -65,16 +72,25 @@ func (c *Client) SetSettings(fields map[string]interface{}) error {
 	return err
 }
 
-// ReplaceSettings atomically deletes all settings, writes new ones, and
-// publishes a reload notification so subscribers refresh their state.
+// ReplaceSettings writes the given fields to the settings hash inside a
+// MULTI/EXEC transaction and publishes one notification per field on
+// SettingsChannel. The transaction guarantees that no other client can
+// observe a partial hash mid-write, and the per-field publishes let
+// subscribers react with the same code path they use for runtime HSETs —
+// no special "everything changed" sentinel.
+//
+// Redis is not persisted on this platform, so the hash starts empty at
+// boot and there's nothing to clear before writing.
 func (c *Client) ReplaceSettings(fields map[string]interface{}) error {
-	pipe := c.client.Pipeline()
-	pipe.Del(c.ctx, SettingsKey)
-	for field, value := range fields {
-		pipe.HSet(c.ctx, SettingsKey, field, value)
-	}
-	pipe.Publish(c.ctx, SettingsChannel, "reload")
-	_, err := pipe.Exec(c.ctx)
+	_, err := c.client.TxPipelined(c.ctx, func(pipe redis.Pipeliner) error {
+		for field, value := range fields {
+			pipe.HSet(c.ctx, SettingsKey, field, value)
+		}
+		for field := range fields {
+			pipe.Publish(c.ctx, SettingsChannel, field)
+		}
+		return nil
+	})
 	return err
 }
 

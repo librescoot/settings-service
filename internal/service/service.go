@@ -109,19 +109,31 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		log.Printf("Published schema to Redis key %q", redis.SchemaKey)
 	}
 
-	// APN sync
-	if apn, ok := fields["cellular.apn"]; ok && apn != "" {
-		currentAPN, err := network.GetCurrentAPN()
-		if err != nil {
-			log.Printf("Error reading current APN: %v", err)
-		} else if currentAPN != fmt.Sprintf("%v", apn) {
-			log.Printf("APN mismatch detected: NetworkManager has '%s', settings have '%v'", currentAPN, apn)
-			if err := network.UpdateAPN(fmt.Sprintf("%v", apn)); err != nil {
-				log.Printf("Error updating NetworkManager APN on startup: %v", err)
+	// APN and journal-upload reconciliation both shell out to systemctl /
+	// NetworkManager and can take many seconds on a cold boot. Run them in
+	// the background so LoadSettingsFromTOML returns as soon as Redis is
+	// populated — the main goroutine can move on to starting WatchSettings
+	// (and unblocks any other service waiting on a populated settings hash).
+	apnStr := ""
+	if v, ok := fields["cellular.apn"]; ok && v != nil {
+		apnStr = fmt.Sprintf("%v", v)
+	}
+	if apnStr != "" {
+		go func() {
+			currentAPN, err := network.GetCurrentAPN()
+			if err != nil {
+				log.Printf("Error reading current APN: %v", err)
+				return
 			}
-		} else {
-			log.Printf("APN is already synchronized: %v", apn)
-		}
+			if currentAPN != apnStr {
+				log.Printf("APN mismatch detected: NetworkManager has '%s', settings have '%s'", currentAPN, apnStr)
+				if err := network.UpdateAPN(apnStr); err != nil {
+					log.Printf("Error updating NetworkManager APN on startup: %v", err)
+				}
+			} else {
+				log.Printf("APN is already synchronized: %s", apnStr)
+			}
+		}()
 	}
 
 	// journal-upload log server sync. Missing or empty value disables the
@@ -131,9 +143,11 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	if v, ok := fields["scooter.logserver"]; ok && v != nil {
 		logserver = fmt.Sprintf("%v", v)
 	}
-	if err := journalupload.ApplyLogServer(logserver); err != nil {
-		log.Printf("Error applying log server on startup: %v", err)
-	}
+	go func() {
+		if err := journalupload.ApplyLogServer(logserver); err != nil {
+			log.Printf("Error applying log server on startup: %v", err)
+		}
+	}()
 
 	return nil
 }
@@ -194,8 +208,12 @@ func (s *SettingsService) markUserSet(field string) {
 	s.userSetKeys[field] = struct{}{}
 }
 
-// WatchSettings monitors Redis for changes and updates TOML file
+// WatchSettings monitors Redis for changes and updates TOML file. The
+// subscription is opened here rather than at client construction so the
+// initial bulk load from LoadSettingsFromTOML doesn't reach this loop —
+// otherwise every schema default would be marked user-set on first boot.
 func (s *SettingsService) WatchSettings() {
+	s.redisClient.Subscribe()
 	ch := s.redisClient.WatchChannel()
 
 	for {
@@ -204,11 +222,11 @@ func (s *SettingsService) WatchSettings() {
 			if msg.Channel == redis.SettingsChannel {
 				log.Printf("Received update notification for field: %s", msg.Payload)
 
-				// "reload" comes from our own ReplaceSettings during
-				// LoadSettingsFromTOML and is not a field name. Field-name
-				// payloads come from runtime HSETs (lsc, bluetooth-service,
-				// etc.) and count as user-set.
-				if msg.Payload != "" && msg.Payload != "reload" {
+				// Every payload on this channel is now a field name —
+				// either from a runtime HSET (lsc, bluetooth-service, etc.)
+				// or from our own ReplaceSettings (which the Subscribe()
+				// ordering above guarantees we don't see).
+				if msg.Payload != "" {
 					s.markUserSet(msg.Payload)
 				}
 
