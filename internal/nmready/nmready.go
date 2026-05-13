@@ -2,7 +2,6 @@ package nmready
 
 import (
 	"context"
-	"errors"
 	"log"
 	"os/exec"
 	"strings"
@@ -10,8 +9,8 @@ import (
 )
 
 const (
-	DefaultTimeout = 120 * time.Second
-	PollInterval   = 2 * time.Second
+	InitialBackoff = 2 * time.Second
+	MaxBackoff     = 60 * time.Second
 )
 
 // IsRunning returns true if NetworkManager currently responds as running.
@@ -24,30 +23,31 @@ func IsRunning() bool {
 	return strings.TrimSpace(string(out)) == "running"
 }
 
-// Wait blocks until NetworkManager is running, ctx is cancelled, or timeout
-// elapses. Returns nil on success, ctx.Err() on cancel, or a timeout error.
-func Wait(ctx context.Context, timeout time.Duration) error {
+// Wait blocks until NetworkManager is running or ctx is cancelled. Polls with
+// exponential backoff (starts at InitialBackoff, caps at MaxBackoff). There
+// is no internal timeout — callers control the deadline via ctx.
+func Wait(ctx context.Context) error {
 	if IsRunning() {
 		return nil
 	}
 
-	log.Printf("Waiting for NetworkManager to become available (timeout %v)...", timeout)
+	log.Println("Waiting for NetworkManager to become available...")
 
-	ticker := time.NewTicker(PollInterval)
-	defer ticker.Stop()
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
+	backoff := InitialBackoff
 	for {
+		timer := time.NewTimer(backoff)
 		select {
-		case <-ticker.C:
+		case <-timer.C:
 			if IsRunning() {
 				log.Println("NetworkManager is running")
 				return nil
 			}
-		case <-timer.C:
-			return errors.New("timed out waiting for NetworkManager")
+			backoff *= 2
+			if backoff > MaxBackoff {
+				backoff = MaxBackoff
+			}
 		case <-ctx.Done():
+			timer.Stop()
 			return ctx.Err()
 		}
 	}
