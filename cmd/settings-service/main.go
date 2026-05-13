@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/librescoot/settings-service/internal/config"
 	"github.com/librescoot/settings-service/internal/service"
 	"github.com/librescoot/settings-service/internal/wireguard"
@@ -58,16 +57,14 @@ func main() {
 		log.Printf("Warning: Failed to load initial settings from TOML: %v", err)
 	}
 
-	// Initialize WireGuard connections
-	wgRedis := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
-	})
+	// Sync WireGuard from /data/wireguard/ to NetworkManager in the
+	// background. Blocks until NM is up (backoff) — settings-service must
+	// stay startable early for other services even when NM isn't ready.
 	wgCtx, wgCancel := context.WithCancel(context.Background())
-	wgManager := wireguard.NewManager(wgRedis)
+	wgManager := wireguard.NewManager()
 	go func() {
-		defer wgRedis.Close()
 		if err := wgManager.Initialize(wgCtx); err != nil {
-			log.Printf("Error initializing WireGuard: %v", err)
+			log.Printf("Error syncing WireGuard: %v", err)
 		}
 	}()
 

@@ -2,248 +2,217 @@ package wireguard
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/librescoot/settings-service/internal/nmready"
 )
 
 var WireGuardConfigDir = "/data/wireguard"
 
-const (
-	DefaultTimeout = 120 * time.Second
-	SettlingDelay  = 3 * time.Second
-	PollInterval   = 2 * time.Second
-)
-
-// Manager handles WireGuard connection lifecycle
+// Manager synchronizes the WireGuard config directory (the UMS-visible source
+// of truth) with NetworkManager. New or changed *.conf files are imported;
+// conf files the user removed cause the matching NM connection to be deleted.
+// A sha256 sidecar per conf (<name>.sha256) records what we last imported
+// so we can re-import only on actual content change.
 type Manager struct {
-	configDir   string
-	timeout     time.Duration
-	redisClient *redis.Client
+	configDir string
 }
 
-// NewManager creates a new WireGuard manager with a Redis client for internet detection
-func NewManager(redisClient *redis.Client) *Manager {
-	return &Manager{
-		configDir:   WireGuardConfigDir,
-		timeout:     DefaultTimeout,
-		redisClient: redisClient,
-	}
+func NewManager() *Manager {
+	return &Manager{configDir: WireGuardConfigDir}
 }
 
-// NewManagerWithOptions creates a manager with custom options (useful for testing)
-func NewManagerWithOptions(configDir string, timeout time.Duration, redisClient *redis.Client) *Manager {
-	return &Manager{
-		configDir:   configDir,
-		timeout:     timeout,
-		redisClient: redisClient,
-	}
+func NewManagerWithOptions(configDir string) *Manager {
+	return &Manager{configDir: configDir}
 }
 
-// Initialize performs the WireGuard initialization sequence
+// Initialize syncs /data/wireguard/ with NetworkManager. Blocks until NM is
+// available (with backoff via nmready.Wait) or ctx is cancelled.
 func (m *Manager) Initialize(ctx context.Context) error {
-	log.Println("Starting WireGuard initialization...")
+	log.Println("Starting WireGuard sync...")
 
-	// settings-service starts early (only ordered After=redis). NetworkManager
-	// may not be up yet — wait for it before invoking nmcli, otherwise every
-	// call returns "NetworkManager is not running" and we skip the import.
-	if err := nmready.Wait(ctx, m.timeout); err != nil {
-		return fmt.Errorf("NetworkManager not available: %w", err)
+	if err := nmready.Wait(ctx); err != nil {
+		return fmt.Errorf("wait for NetworkManager: %w", err)
 	}
 
-	if err := m.deleteExistingConnections(); err != nil {
-		return fmt.Errorf("failed to delete existing connections: %w", err)
-	}
-
-	shouldImport, err := m.shouldImportConfigs()
+	confs, err := m.listConfs()
 	if err != nil {
-		log.Printf("Error checking for WireGuard configs: %v", err)
+		return fmt.Errorf("list configs: %w", err)
 	}
 
-	if !shouldImport {
-		log.Println("No WireGuard configurations to import, all connections have been removed")
-		return nil
+	conns, err := listWireGuardConnections()
+	if err != nil {
+		return fmt.Errorf("list NM wireguard connections: %w", err)
 	}
 
-	if err := m.waitForInternet(ctx); err != nil {
-		return fmt.Errorf("internet wait cancelled: %w", err)
+	// Orphan cleanup: NM has a WG connection but no matching .conf — user
+	// removed the conf via UMS and expects the tunnel gone.
+	for _, c := range conns {
+		if _, ok := confs[c.name]; ok {
+			continue
+		}
+		log.Printf("Removing orphaned WireGuard connection (no matching .conf): %s", c.name)
+		if err := deleteByUUID(c.uuid); err != nil {
+			log.Printf("Warning: delete %s (%s): %v", c.name, c.uuid, err)
+		}
 	}
 
-	if err := m.importConfigurations(); err != nil {
-		return fmt.Errorf("failed to import configurations: %w", err)
+	// Drop sidecars for confs that are gone, so a future re-add forces import.
+	if err := m.pruneOrphanSidecars(confs); err != nil {
+		log.Printf("Warning: prune sidecars: %v", err)
 	}
 
-	log.Println("WireGuard initialization completed")
+	// Sync each conf.
+	for name, path := range confs {
+		if err := m.syncConf(name, path, conns); err != nil {
+			log.Printf("Warning: sync %s: %v", name, err)
+		}
+	}
+
+	log.Println("WireGuard sync completed")
 	return nil
 }
 
-// waitForInternet waits for internet connectivity via Redis, falling back to a timeout
-func (m *Manager) waitForInternet(ctx context.Context) error {
-	if m.redisClient == nil {
-		log.Printf("No Redis client, waiting %v before importing WireGuard configurations...", m.timeout)
-		select {
-		case <-time.After(m.timeout):
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
-	if m.isInternetConnected(ctx) {
-		log.Println("Internet already connected, settling before WireGuard import...")
-		select {
-		case <-time.After(SettlingDelay):
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-
-	log.Printf("Waiting for internet connectivity (timeout %v)...", m.timeout)
-
-	pubsub := m.redisClient.Subscribe(ctx, "internet")
-	defer pubsub.Close()
-
-	msgCh := pubsub.Channel()
-	pollTicker := time.NewTicker(PollInterval)
-	defer pollTicker.Stop()
-	timeoutTimer := time.NewTimer(m.timeout)
-	defer timeoutTimer.Stop()
-
-	for {
-		select {
-		case msg := <-msgCh:
-			if msg != nil && msg.Payload == "status" {
-				if m.isInternetConnected(ctx) {
-					log.Println("Internet connected (via pub/sub), settling before WireGuard import...")
-					select {
-					case <-time.After(SettlingDelay):
-						return nil
-					case <-ctx.Done():
-						return ctx.Err()
-					}
-				}
-			}
-		case <-pollTicker.C:
-			if m.isInternetConnected(ctx) {
-				log.Println("Internet connected (via poll), settling before WireGuard import...")
-				select {
-				case <-time.After(SettlingDelay):
-					return nil
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		case <-timeoutTimer.C:
-			log.Printf("Internet wait timed out after %v, proceeding with WireGuard import anyway", m.timeout)
-			return nil
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-}
-
-// isInternetConnected checks the Redis internet hash for connected status
-func (m *Manager) isInternetConnected(ctx context.Context) bool {
-	status, err := m.redisClient.HGet(ctx, "internet", "status").Result()
+// syncConf imports `path` if its sha256 differs from the recorded sidecar or
+// if no matching NM connection exists. Existing NM connections with the same
+// name are deleted first to avoid duplicates (nmcli import always creates a
+// new UUID).
+func (m *Manager) syncConf(name, path string, conns []wgConn) error {
+	hash, err := hashFile(path)
 	if err != nil {
-		return false
+		return fmt.Errorf("hash conf: %w", err)
 	}
-	return status == "connected"
+
+	sidecar := m.sidecarPath(name)
+	stored, _ := os.ReadFile(sidecar)
+	nmHas := false
+	for _, c := range conns {
+		if c.name == name {
+			nmHas = true
+			break
+		}
+	}
+
+	if nmHas && string(stored) == hash {
+		log.Printf("WireGuard %s up to date, skipping", name)
+		return nil
+	}
+
+	// Delete any NM connections with this name (could be multiple from a
+	// previous duplicate-import bug). Errors are non-fatal — the import
+	// step will surface a real problem.
+	for _, c := range conns {
+		if c.name != name {
+			continue
+		}
+		if err := deleteByUUID(c.uuid); err != nil {
+			log.Printf("Warning: delete %s (%s): %v", name, c.uuid, err)
+		}
+	}
+
+	log.Printf("Importing WireGuard configuration: %s", filepath.Base(path))
+	out, err := exec.Command("nmcli", "connection", "import", "type", "wireguard", "file", path).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nmcli import: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	if err := os.WriteFile(sidecar, []byte(hash), 0600); err != nil {
+		log.Printf("Warning: write sidecar %s: %v", sidecar, err)
+	}
+	return nil
 }
 
-// shouldImportConfigs checks if there are config files to import
-func (m *Manager) shouldImportConfigs() (bool, error) {
+// listConfs returns map[name]path for every *.conf in the config dir, where
+// name is the basename without the .conf suffix.
+func (m *Manager) listConfs() (map[string]string, error) {
+	out := map[string]string{}
 	if _, err := os.Stat(m.configDir); os.IsNotExist(err) {
-		return false, nil
+		return out, nil
 	}
-
-	pattern := filepath.Join(m.configDir, "*.conf")
-	files, err := filepath.Glob(pattern)
+	matches, err := filepath.Glob(filepath.Join(m.configDir, "*.conf"))
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-
-	return len(files) > 0, nil
+	for _, p := range matches {
+		name := strings.TrimSuffix(filepath.Base(p), ".conf")
+		out[name] = p
+	}
+	return out, nil
 }
 
-// deleteExistingConnections removes all existing WireGuard connections
-func (m *Manager) deleteExistingConnections() error {
-	cmd := exec.Command("nmcli", "-t", "-f", "NAME,TYPE", "con", "show")
-	output, err := cmd.Output()
+func (m *Manager) sidecarPath(name string) string {
+	return filepath.Join(m.configDir, name+".sha256")
+}
+
+// pruneOrphanSidecars removes <name>.sha256 files whose .conf is gone.
+func (m *Manager) pruneOrphanSidecars(confs map[string]string) error {
+	matches, err := filepath.Glob(filepath.Join(m.configDir, "*.sha256"))
 	if err != nil {
-		return fmt.Errorf("failed to list connections: %w", err)
+		return err
 	}
+	for _, p := range matches {
+		name := strings.TrimSuffix(filepath.Base(p), ".sha256")
+		if _, ok := confs[name]; ok {
+			continue
+		}
+		if err := os.Remove(p); err != nil {
+			log.Printf("Warning: remove stale sidecar %s: %v", p, err)
+		}
+	}
+	return nil
+}
 
-	lines := strings.Split(string(output), "\n")
-	deletedCount := 0
-	var failed []string
+type wgConn struct {
+	name string
+	uuid string
+}
 
-	for _, line := range lines {
+// listWireGuardConnections returns all NM connections of type wireguard.
+func listWireGuardConnections() ([]wgConn, error) {
+	out, err := exec.Command("nmcli", "-t", "-f", "NAME,UUID,TYPE", "con", "show").Output()
+	if err != nil {
+		return nil, fmt.Errorf("nmcli con show: %w", err)
+	}
+	var conns []wgConn
+	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-
+		// NAME may contain escaped colons (`\:`). Split from the right so
+		// the last two fields (UUID, TYPE) are always correct.
 		parts := strings.Split(line, ":")
-		if len(parts) >= 2 && parts[1] == "wireguard" {
-			connName := parts[0]
-			log.Printf("Deleting WireGuard connection: %s", connName)
-
-			cmd := exec.Command("nmcli", "con", "delete", connName)
-			if err := cmd.Run(); err != nil {
-				log.Printf("Warning: Failed to delete connection %s: %v", connName, err)
-				failed = append(failed, connName)
-			} else {
-				deletedCount++
-			}
+		if len(parts) < 3 {
+			continue
 		}
+		typ := parts[len(parts)-1]
+		uuid := parts[len(parts)-2]
+		name := strings.Join(parts[:len(parts)-2], ":")
+		name = strings.ReplaceAll(name, `\:`, ":")
+		if typ != "wireguard" {
+			continue
+		}
+		conns = append(conns, wgConn{name: name, uuid: uuid})
 	}
-
-	log.Printf("Deleted %d WireGuard connections", deletedCount)
-	if len(failed) > 0 {
-		return fmt.Errorf("failed to delete %d connections: %s", len(failed), strings.Join(failed, ", "))
-	}
-	return nil
+	return conns, nil
 }
 
-// importConfigurations imports all WireGuard config files from the config directory
-func (m *Manager) importConfigurations() error {
-	if _, err := os.Stat(m.configDir); os.IsNotExist(err) {
-		log.Printf("WireGuard config directory %s does not exist, skipping import", m.configDir)
-		return nil
-	}
+func deleteByUUID(uuid string) error {
+	return exec.Command("nmcli", "con", "delete", uuid).Run()
+}
 
-	pattern := filepath.Join(m.configDir, "*.conf")
-	files, err := filepath.Glob(pattern)
+func hashFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to list config files: %w", err)
+		return "", err
 	}
-
-	if len(files) == 0 {
-		log.Printf("No WireGuard configuration files found in %s", m.configDir)
-		return nil
-	}
-
-	importedCount := 0
-	for _, file := range files {
-		log.Printf("Importing WireGuard configuration: %s", filepath.Base(file))
-
-		cmd := exec.Command("nmcli", "connection", "import", "type", "wireguard", "file", file)
-		if err := cmd.Run(); err != nil {
-			log.Printf("Warning: Failed to import %s: %v", file, err)
-		} else {
-			importedCount++
-		}
-	}
-
-	log.Printf("Imported %d WireGuard configurations", importedCount)
-	return nil
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
 }
