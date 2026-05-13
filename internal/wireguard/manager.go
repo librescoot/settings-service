@@ -91,7 +91,8 @@ func (m *Manager) syncConf(name, path string, conns []wgConn) error {
 	}
 
 	sidecar := m.sidecarPath(name)
-	stored, _ := os.ReadFile(sidecar)
+	storedRaw, _ := os.ReadFile(sidecar)
+	stored := strings.TrimSpace(string(storedRaw))
 	nmHas := false
 	for _, c := range conns {
 		if c.name == name {
@@ -100,7 +101,7 @@ func (m *Manager) syncConf(name, path string, conns []wgConn) error {
 		}
 	}
 
-	if nmHas && string(stored) == hash {
+	if nmHas && stored == hash {
 		log.Printf("WireGuard %s up to date, skipping", name)
 		return nil
 	}
