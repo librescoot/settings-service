@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/librescoot/settings-service/internal/fileutil"
+	"github.com/librescoot/settings-service/internal/nmready"
 )
 
 const NMConnectionPath = "/etc/NetworkManager/system-connections/wwan.nmconnection"
@@ -117,7 +118,15 @@ func UpdateAPN(apn string) error {
 
 	log.Printf("Updated NetworkManager APN to: %s", apn)
 
-	// Restart NetworkManager to apply changes
+	// Only restart NM if it's already up. On early boot NM may not have
+	// started yet — the new config will be picked up on its own start, and
+	// 'systemctl restart' against an inactive unit just starts it anyway,
+	// but we avoid the noisy failure path and racing with NM's own startup.
+	if !nmready.IsRunning() {
+		log.Println("NetworkManager not running yet, skipping restart; new APN will apply on its first start")
+		return nil
+	}
+
 	log.Println("Restarting NetworkManager to apply APN changes...")
 	cmd := exec.Command("systemctl", "restart", "NetworkManager")
 	if err := cmd.Run(); err != nil {

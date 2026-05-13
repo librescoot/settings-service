@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/librescoot/settings-service/internal/nmready"
 )
 
 var WireGuardConfigDir = "/data/wireguard"
@@ -49,6 +50,13 @@ func NewManagerWithOptions(configDir string, timeout time.Duration, redisClient 
 // Initialize performs the WireGuard initialization sequence
 func (m *Manager) Initialize(ctx context.Context) error {
 	log.Println("Starting WireGuard initialization...")
+
+	// settings-service starts early (only ordered After=redis). NetworkManager
+	// may not be up yet — wait for it before invoking nmcli, otherwise every
+	// call returns "NetworkManager is not running" and we skip the import.
+	if err := nmready.Wait(ctx, m.timeout); err != nil {
+		return fmt.Errorf("NetworkManager not available: %w", err)
+	}
 
 	if err := m.deleteExistingConnections(); err != nil {
 		return fmt.Errorf("failed to delete existing connections: %w", err)
