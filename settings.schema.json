@@ -423,11 +423,39 @@
   },
   "cellular.apn": {
     "type": "string",
-    "description": "Cellular APN string",
+    "description": "LTE attach + data bearer APN. Empty = use SIM operator defaults.",
     "label": "Cellular APN",
     "user-visible": false,
     "service": "modem-service",
+    "default": "",
     "example": "internet"
+  },
+  "cellular.username": {
+    "type": "string",
+    "description": "APN username (PAP/CHAP authentication). Empty = none.",
+    "label": "Cellular APN username",
+    "user-visible": false,
+    "service": "modem-service",
+    "default": "",
+    "example": "congstar"
+  },
+  "cellular.password": {
+    "type": "string",
+    "description": "APN password (PAP/CHAP authentication). Empty = none.",
+    "label": "Cellular APN password",
+    "user-visible": false,
+    "service": "modem-service",
+    "default": "",
+    "example": "cs"
+  },
+  "cellular.auth": {
+    "type": "string",
+    "description": "APN authentication type for data bearer. One of: none, pap, chap.",
+    "label": "Cellular APN auth",
+    "user-visible": false,
+    "service": "modem-service",
+    "default": "none",
+    "example": "pap"
   },
   "cellular.sim-pin": {
     "type": "string",
