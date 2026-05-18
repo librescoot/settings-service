@@ -100,6 +100,28 @@
     "min": 0,
     "example": 1000
   },
+  "scooter.battery-aux-low-keep-active-enter-mv": {
+    "type": "int",
+    "description": "Aux battery voltage (mV) below which the keep-active-on-seatbox-open override engages automatically",
+    "label": "Aux-Low Keep-Active Enter Threshold",
+    "user-visible": false,
+    "service": "battery-service",
+    "default": 11500,
+    "unit": "mV",
+    "min": 0,
+    "example": 11500
+  },
+  "scooter.battery-aux-low-keep-active-exit-mv": {
+    "type": "int",
+    "description": "Aux battery voltage (mV) at or above which the aux-low keep-active override disengages (must be > enter threshold)",
+    "label": "Aux-Low Keep-Active Exit Threshold",
+    "user-visible": false,
+    "service": "battery-service",
+    "default": 12000,
+    "unit": "mV",
+    "min": 0,
+    "example": 12000
+  },
   "pm.hibernation-timer": {
     "type": "int",
     "description": "Hibernation timeout in seconds",
