@@ -139,7 +139,7 @@
     "label": "Default Power State",
     "user-visible": false,
     "service": "pm-service",
-    "default": "run",
+    "default": "suspend",
     "values": [
       {
         "value": "run",
