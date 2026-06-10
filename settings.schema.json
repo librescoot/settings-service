@@ -152,6 +152,15 @@
     ],
     "example": "suspend"
   },
+  "pm.suspend-when-online": {
+    "type": "bool",
+    "description": "Allow a locked scooter with a main battery inserted to suspend while it has internet connectivity. When false, it stays awake so cloud commands can still reach it.",
+    "label": "Suspend While Online",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": false,
+    "example": false
+  },
   "pm.scheduled-hibernate-enabled": {
     "type": "bool",
     "description": "Enable scheduled hibernation defined by pm.scheduled-hibernate-cron and pm.scheduled-hibernate-duration",
