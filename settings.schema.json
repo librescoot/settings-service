@@ -23,7 +23,7 @@
     "label": "Alarm Duration",
     "user-visible": true,
     "service": "alarm-service",
-    "default": 60,
+    "default": 30,
     "unit": "seconds",
     "min": 0,
     "max": 300,
