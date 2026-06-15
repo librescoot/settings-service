@@ -702,6 +702,52 @@
     ],
     "example": "range"
   },
+  "dashboard.show-cb-battery": {
+    "type": "enum",
+    "description": "CBB charge icon visibility in the status bar (warning = only when SoC <= 50%)",
+    "label": "CBB Battery",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "warning",
+    "values": [
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "warning",
+        "label": "When Low"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
+    ],
+    "example": "warning"
+  },
+  "dashboard.show-aux-battery": {
+    "type": "enum",
+    "description": "12V battery charge icon visibility in the status bar (warning = only when SoC <= 50%)",
+    "label": "12V Battery",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "warning",
+    "values": [
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "warning",
+        "label": "When Low"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
+    ],
+    "example": "warning"
+  },
   "dashboard.map.type": {
     "type": "enum",
     "description": "Map tile source",
