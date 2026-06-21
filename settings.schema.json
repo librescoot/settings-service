@@ -662,7 +662,7 @@
     "label": "Internet Indicator",
     "user-visible": true,
     "service": "scootui",
-    "default": "never",
+    "default": "active-or-error",
     "values": [
       {
         "value": "always",
