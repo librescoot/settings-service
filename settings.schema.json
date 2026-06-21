@@ -817,6 +817,33 @@
     ],
     "example": "auto"
   },
+  "dashboard.backlight-mode": {
+    "type": "enum",
+    "description": "Display backlight level (auto = ambient light sensor)",
+    "label": "Backlight",
+    "user-visible": true,
+    "service": "dbc-backlight",
+    "default": "auto",
+    "values": [
+      {
+        "value": "auto",
+        "label": "Auto"
+      },
+      {
+        "value": "low",
+        "label": "Low"
+      },
+      {
+        "value": "medium",
+        "label": "Medium"
+      },
+      {
+        "value": "high",
+        "label": "High"
+      }
+    ],
+    "example": "auto"
+  },
   "dashboard.mode": {
     "type": "enum",
     "description": "Default screen mode",
