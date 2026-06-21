@@ -226,7 +226,7 @@
     "type": "int",
     "description": "Grace period in seconds before locking the scooter after the connected phone disconnects while parked (0=disabled)",
     "label": "Lock on Bluetooth disconnect",
-    "user-visible": true,
+    "user-visible": false,
     "service": "vehicle-service",
     "default": 0,
     "unit": "seconds",
