@@ -222,6 +222,17 @@
     "min": 0,
     "example": 300
   },
+  "scooter.lock-on-bluetooth-disconnect-seconds": {
+    "type": "int",
+    "description": "Grace period in seconds before locking the scooter after the connected phone disconnects while parked (0=disabled)",
+    "label": "Lock on Bluetooth disconnect",
+    "user-visible": true,
+    "service": "vehicle-service",
+    "default": 0,
+    "unit": "seconds",
+    "min": 0,
+    "example": 10
+  },
   "scooter.brake-hibernation": {
     "type": "enum",
     "description": "Enable brake lever hibernation",
