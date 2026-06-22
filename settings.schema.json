@@ -71,6 +71,33 @@
     "max": 60,
     "example": 15
   },
+  "alarm.trigger.motion": {
+    "type": "bool",
+    "description": "Enable BMX055 motion as an alarm trigger source",
+    "label": "Motion Alarm Trigger",
+    "user-visible": false,
+    "service": "alarm-service",
+    "default": true,
+    "example": true
+  },
+  "alarm.trigger.handlebar": {
+    "type": "bool",
+    "description": "Enable handlebar lock-sensor / position as an alarm trigger source",
+    "label": "Handlebar Alarm Trigger",
+    "user-visible": false,
+    "service": "alarm-service",
+    "default": true,
+    "example": true
+  },
+  "alarm.trigger.buttons": {
+    "type": "bool",
+    "description": "Enable brake/horn/seatbox button presses as an alarm trigger source",
+    "label": "Buttons Alarm Trigger",
+    "user-visible": false,
+    "service": "alarm-service",
+    "default": true,
+    "example": true
+  },
   "scooter.battery-keep-active-on-seatbox-open": {
     "type": "bool",
     "description": "Keep a running battery active when the seatbox opens instead of deactivating it",
@@ -1071,6 +1098,46 @@
     "min": -180,
     "max": 180,
     "example": 13.405
+  },
+  "dashboard.recent-destinations.0.label": {
+    "type": "string",
+    "description": "Recent destination label",
+    "label": "Recent Destination Label",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "Home"
+  },
+  "dashboard.recent-destinations.0.latitude": {
+    "type": "float",
+    "description": "Latitude",
+    "label": "Recent Destination Latitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -90,
+    "max": 90,
+    "example": 52.52
+  },
+  "dashboard.recent-destinations.0.longitude": {
+    "type": "float",
+    "description": "Longitude",
+    "label": "Recent Destination Longitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -180,
+    "max": 180,
+    "example": 13.405
+  },
+  "dashboard.recent-destinations.0.used-at": {
+    "type": "string",
+    "description": "Last used timestamp",
+    "label": "Recent Destination Used At",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "2025-01-15T12:00:00Z"
   },
   "updates.mdb.releases-url": {
     "type": "url",
