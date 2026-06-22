@@ -57,6 +57,11 @@ func main() {
 		log.Printf("Warning: Failed to load initial settings from TOML: %v", err)
 	}
 
+	// Re-apply the service overlay if it was active before reboot. Done after
+	// the base load (so capture sees real base values) and before WatchSettings
+	// starts so the overlay's own writes hit the no-clobber guard.
+	svc.ReapplyOverlayOnBoot()
+
 	// Sync WireGuard from /data/wireguard/ to NetworkManager in the
 	// background. Blocks until NM is up (backoff) — settings-service must
 	// stay startable early for other services even when NM isn't ready.
@@ -70,6 +75,9 @@ func main() {
 
 	// Start watching for Redis updates
 	go svc.WatchSettings()
+
+	// Consume service:overlay apply/clear commands.
+	go svc.RunOverlayConsumer()
 
 	// Setup signal handling
 	sigChan := make(chan os.Signal, 1)

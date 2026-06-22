@@ -127,3 +127,46 @@ func (s *SettingsService) ClearServiceOverlay() error {
 	log.Printf("Service overlay cleared (%d keys restored)", len(base))
 	return nil
 }
+
+// RunOverlayConsumer blocks on the settings:overlay list and dispatches
+// apply/clear commands. Intended to run in its own goroutine.
+func (s *SettingsService) RunOverlayConsumer() {
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+		cmd, err := s.redisClient.BRPopOverlay()
+		if err != nil {
+			if s.ctx.Err() != nil {
+				return
+			}
+			log.Printf("overlay consumer BRPop error: %v", err)
+			continue
+		}
+		switch cmd {
+		case "apply:service":
+			if err := s.ApplyServiceOverlay(); err != nil {
+				log.Printf("apply:service failed: %v", err)
+			}
+		case "clear:service":
+			if err := s.ClearServiceOverlay(); err != nil {
+				log.Printf("clear:service failed: %v", err)
+			}
+		default:
+			log.Printf("overlay consumer: unknown command %q", cmd)
+		}
+	}
+}
+
+// ReapplyOverlayOnBoot re-applies the service overlay if it was active before a
+// reboot. Call after the base settings are loaded into Redis.
+func (s *SettingsService) ReapplyOverlayOnBoot() {
+	if loadOverlayActive() {
+		log.Printf("Service overlay was active before reboot; re-applying")
+		if err := s.ApplyServiceOverlay(); err != nil {
+			log.Printf("Boot re-apply failed: %v", err)
+		}
+	}
+}
