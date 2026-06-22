@@ -341,6 +341,15 @@
     ],
     "example": "in-drive"
   },
+  "scooter.horn-when-seatbox-open": {
+    "type": "bool",
+    "description": "Allow the manual horn button to sound while the seatbox is open and the scooter is unlocked. Disabled by default so the open seat lid resting on the button does not honk.",
+    "label": "Horn While Seatbox Open",
+    "user-visible": true,
+    "service": "vehicle-service",
+    "default": false,
+    "example": true
+  },
   "updates.mdb.method": {
     "type": "enum",
     "description": "Update method for MDB",
