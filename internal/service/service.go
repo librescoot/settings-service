@@ -28,6 +28,12 @@ type SettingsService struct {
 	// are not. Runtime HSETs (lsc, bluetooth-service, ...) add their field
 	// to the set when the change notification arrives. Mutated under mu.
 	userSetKeys map[string]struct{}
+
+	// overlayActive is true while the service-mode overlay is applied.
+	// overlayBase records the pre-overlay value of each overridden key so it
+	// can be restored on clear. Both guarded by mu.
+	overlayActive bool
+	overlayBase   map[string]capturedVal
 }
 
 // New creates a new settings service instance
@@ -292,11 +298,12 @@ func (s *SettingsService) WatchSettings() {
 				// user-set and don't rewrite the toml just because one
 				// changed.
 				transient := s.schema.IsTransient(msg.Payload)
-				if msg.Payload != "" && !transient {
+				overlaid := s.isOverlaid(msg.Payload)
+				if msg.Payload != "" && overlayShouldPersist(transient, overlaid) {
 					s.markUserSet(msg.Payload)
 				}
 
-				if !transient {
+				if overlayShouldPersist(transient, overlaid) {
 					if err := s.SaveSettingsToTOML(); err != nil {
 						log.Printf("Error saving settings to TOML: %v", err)
 					}
