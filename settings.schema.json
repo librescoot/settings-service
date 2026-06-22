@@ -299,6 +299,16 @@
     ],
     "example": "always-on"
   },
+  "scooter.handlebar-unlocked": {
+    "type": "bool",
+    "description": "When true, the handlebar lock latch is released and auto re-lock is suppressed. Set by the service-mode overlay; transient so it never persists.",
+    "label": "Handlebar Unlocked",
+    "user-visible": false,
+    "service": "vehicle-service",
+    "default": false,
+    "transient": true,
+    "example": true
+  },
   "scooter.dbc-blinker-led": {
     "type": "enum",
     "description": "Blink DBC boot LED in sync with blinkers (green for single, red for hazards)",
@@ -906,6 +916,10 @@
       {
         "value": "navigation",
         "label": "Navigation"
+      },
+      {
+        "value": "debug",
+        "label": "Debug"
       }
     ],
     "example": "navigation"
@@ -992,6 +1006,17 @@
     "service": "scootui",
     "default": false,
     "read-only": true
+  },
+  "dashboard.service-mode-active": {
+    "type": "bool",
+    "description": "Runtime status: service mode is active. Published by settings-service; not user-settable.",
+    "label": "Service Mode Active",
+    "user-visible": false,
+    "read-only": true,
+    "service": "settings-service",
+    "default": false,
+    "transient": true,
+    "example": false
   },
   "dashboard.maps.check-for-updates": {
     "type": "bool",
