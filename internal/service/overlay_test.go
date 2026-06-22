@@ -38,3 +38,31 @@ func TestServiceOverlayFields(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleOverlaidEdit(t *testing.T) {
+	s := &SettingsService{
+		overlayActive: true,
+		overlayBase: map[string]capturedVal{
+			"alarm.enabled": {value: "true", existed: true, wasUserSet: true},
+		},
+	}
+	// User sets alarm.enabled=false while overlay forces it false: same as
+	// overlay value -> our own write, not a user edit.
+	reassert, isEdit := s.handleOverlaidEdit("alarm.enabled", "false")
+	if isEdit {
+		t.Errorf("write matching overlay value should not be a user edit")
+	}
+	_ = reassert
+	// User sets alarm.enabled=true (differs from overlay "false") -> user edit:
+	// base updated, overlay value re-asserted.
+	reassert, isEdit = s.handleOverlaidEdit("alarm.enabled", "true")
+	if !isEdit {
+		t.Fatal("differing write should be a user edit")
+	}
+	if reassert != "false" {
+		t.Errorf("reassert = %q, want overlay value %q", reassert, "false")
+	}
+	if got := s.overlayBase["alarm.enabled"].value; got != "true" {
+		t.Errorf("captured base not updated: %q", got)
+	}
+}

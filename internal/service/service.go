@@ -299,6 +299,20 @@ func (s *SettingsService) WatchSettings() {
 				// changed.
 				transient := s.schema.IsTransient(msg.Payload)
 				overlaid := s.isOverlaid(msg.Payload)
+				if overlaid {
+					if reassert, isEdit := s.handleOverlaidEdit(msg.Payload, s.currentFieldValue(msg.Payload)); isEdit {
+						// Persist the user's base edit, then re-assert the overlay
+						// value so the effective setting stays overridden.
+						s.markUserSet(msg.Payload)
+						if err := s.SaveSettingsToTOML(); err != nil {
+							log.Printf("Error saving settings to TOML: %v", err)
+						}
+						if err := s.redisClient.SetSettingField(msg.Payload, reassert); err != nil {
+							log.Printf("Error re-asserting overlay value for %s: %v", msg.Payload, err)
+						}
+						continue
+					}
+				}
 				if msg.Payload != "" && overlayShouldPersist(transient, overlaid) {
 					s.markUserSet(msg.Payload)
 				}

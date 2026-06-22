@@ -170,3 +170,33 @@ func (s *SettingsService) ReapplyOverlayOnBoot() {
 		}
 	}
 }
+
+// handleOverlaidEdit reconciles a change to an overlaid key observed on the
+// settings channel. If newValue matches the overlay's forced value it is our
+// own write (isUserEdit=false). Otherwise it is a genuine user edit: the
+// captured base is updated so it surfaces on clear, and reassert returns the
+// overlay value the caller must re-write to keep the effective value overridden.
+func (s *SettingsService) handleOverlaidEdit(field, newValue string) (reassert string, isUserEdit bool) {
+	overlayVal := serviceOverlayFields()[field]
+	if newValue == overlayVal {
+		return "", false
+	}
+	s.mu.Lock()
+	if c, ok := s.overlayBase[field]; ok {
+		c.value = newValue
+		c.existed = true
+		c.wasUserSet = true
+		s.overlayBase[field] = c
+	}
+	s.mu.Unlock()
+	return overlayVal, true
+}
+
+// currentFieldValue reads the live settings-hash value of field (empty if absent).
+func (s *SettingsService) currentFieldValue(field string) string {
+	v, _, err := s.redisClient.GetSettingField(field)
+	if err != nil {
+		return ""
+	}
+	return v
+}
