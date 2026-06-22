@@ -7,6 +7,8 @@ import (
 )
 
 func TestOverlayActiveRoundTrip(t *testing.T) {
+	orig := OverlayStatePath
+	t.Cleanup(func() { OverlayStatePath = orig })
 	dir := t.TempDir()
 	OverlayStatePath = filepath.Join(dir, "service-mode.json")
 

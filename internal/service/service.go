@@ -195,6 +195,10 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		return fmt.Errorf("failed to get settings from Redis: %w", err)
 	}
 
+	// Substitute base values for any overlaid keys so overlay values never
+	// reach the TOML file (no-clobber invariant). Safe here: mu is held.
+	overlayBaseForPersist(settings, s.overlayActive, s.overlayBase)
+
 	log.Printf("Retrieved %d settings from Redis", len(settings))
 	for k, v := range settings {
 		log.Printf("  %s = %s", k, v)

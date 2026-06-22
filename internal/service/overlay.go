@@ -36,6 +36,23 @@ func serviceOverlayFields() map[string]string {
 	}
 }
 
+// overlayBaseForPersist rewrites settings so overlaid keys carry their captured
+// base value (or are removed if they did not exist pre-overlay) before the map
+// is persisted to TOML. No-op when the overlay is inactive. Pure: mutates the
+// passed map in place.
+func overlayBaseForPersist(settings map[string]string, active bool, base map[string]capturedVal) {
+	if !active {
+		return
+	}
+	for k, c := range base {
+		if c.existed {
+			settings[k] = c.value
+		} else {
+			delete(settings, k)
+		}
+	}
+}
+
 // isOverlaid reports whether field is currently forced by the active overlay.
 func (s *SettingsService) isOverlaid(field string) bool {
 	s.mu.Lock()
@@ -53,21 +70,32 @@ func (s *SettingsService) isOverlaid(field string) bool {
 // Overlay writes never reach /data/settings.toml because WatchSettings skips
 // persistence for overlaid keys (see overlayShouldPersist / isOverlaid).
 func (s *SettingsService) ApplyServiceOverlay() error {
+	overlay := serviceOverlayFields()
+
+	// Capture current values without holding the lock — Redis I/O must not
+	// block other goroutines that need mu (e.g. WatchSettings).
+	type rawVal struct {
+		value  string
+		existed bool
+	}
+	captured := make(map[string]rawVal, len(overlay))
+	for k := range overlay {
+		cur, existed, err := s.redisClient.GetSettingField(k)
+		if err != nil {
+			return err
+		}
+		captured[k] = rawVal{value: cur, existed: existed}
+	}
+
 	s.mu.Lock()
 	if s.overlayActive {
 		s.mu.Unlock()
 		return nil
 	}
-	overlay := serviceOverlayFields()
 	base := make(map[string]capturedVal, len(overlay))
-	for k := range overlay {
-		cur, existed, err := s.redisClient.GetSettingField(k)
-		if err != nil {
-			s.mu.Unlock()
-			return err
-		}
+	for k, raw := range captured {
 		_, wasUserSet := s.userSetKeys[k]
-		base[k] = capturedVal{value: cur, existed: existed, wasUserSet: wasUserSet}
+		base[k] = capturedVal{value: raw.value, existed: raw.existed, wasUserSet: wasUserSet}
 	}
 	s.overlayBase = base
 	s.overlayActive = true

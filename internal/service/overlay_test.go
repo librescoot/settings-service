@@ -39,6 +39,30 @@ func TestServiceOverlayFields(t *testing.T) {
 	}
 }
 
+func TestOverlayBaseForPersist(t *testing.T) {
+	// inactive: no change
+	s := map[string]string{"alarm.enabled": "false"}
+	overlayBaseForPersist(s, false, map[string]capturedVal{"alarm.enabled": {value: "true", existed: true}})
+	if s["alarm.enabled"] != "false" {
+		t.Errorf("inactive should not change map, got %q", s["alarm.enabled"])
+	}
+	// active: overlaid key restored to base value for persistence
+	s = map[string]string{"alarm.enabled": "false", "other": "x"}
+	overlayBaseForPersist(s, true, map[string]capturedVal{"alarm.enabled": {value: "true", existed: true}})
+	if s["alarm.enabled"] != "true" {
+		t.Errorf("active should substitute base value, got %q", s["alarm.enabled"])
+	}
+	if s["other"] != "x" {
+		t.Errorf("non-overlaid key must be untouched, got %q", s["other"])
+	}
+	// active, key did not exist pre-overlay: removed from persisted map
+	s = map[string]string{"scooter.handlebar-unlocked": "true"}
+	overlayBaseForPersist(s, true, map[string]capturedVal{"scooter.handlebar-unlocked": {existed: false}})
+	if _, ok := s["scooter.handlebar-unlocked"]; ok {
+		t.Errorf("non-existent base key should be deleted from persisted map")
+	}
+}
+
 func TestHandleOverlaidEdit(t *testing.T) {
 	s := &SettingsService{
 		overlayActive: true,
