@@ -11,6 +11,9 @@ const (
 	SettingsKey     = "settings"
 	SettingsChannel = "settings"
 	SchemaKey       = "settings:schema"
+
+	// OverlayList is the Redis list settings-service consumes overlay commands from.
+	OverlayList = "settings:overlay"
 )
 
 type Client struct {
@@ -127,4 +130,40 @@ func (c *Client) SetKey(key, value string) error {
 func (c *Client) Close() {
 	c.pubsub.Close()
 	c.client.Close()
+}
+
+// BRPopOverlay blocks until an overlay command is available and returns it.
+func (c *Client) BRPopOverlay() (string, error) {
+	res, err := c.client.BRPop(c.ctx, 0, OverlayList).Result()
+	if err != nil {
+		return "", err
+	}
+	if len(res) < 2 {
+		return "", fmt.Errorf("unexpected BRPop response")
+	}
+	return res[1], nil
+}
+
+// GetSettingField reads one field from the settings hash. existed is false when
+// the field is absent.
+func (c *Client) GetSettingField(field string) (value string, existed bool, err error) {
+	v, err := c.client.HGet(c.ctx, SettingsKey, field).Result()
+	if err == redis.Nil {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return v, true, nil
+}
+
+// SetSettingField writes one field to the settings hash and publishes the field
+// name so subscribers react, mirroring ReplaceSettings' per-field protocol.
+func (c *Client) SetSettingField(field, value string) error {
+	_, err := c.client.TxPipelined(c.ctx, func(pipe redis.Pipeliner) error {
+		pipe.HSet(c.ctx, SettingsKey, field, value)
+		pipe.Publish(c.ctx, SettingsChannel, field)
+		return nil
+	})
+	return err
 }
