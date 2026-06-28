@@ -755,6 +755,10 @@
       {
         "value": "range",
         "label": "Range"
+      },
+      {
+        "value": "icon",
+        "label": "Icons Only"
       }
     ],
     "example": "range"
