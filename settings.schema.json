@@ -185,7 +185,7 @@
     "label": "Suspend While Online",
     "user-visible": false,
     "service": "pm-service",
-    "default": false,
+    "default": true,
     "example": false
   },
   "pm.scheduled-hibernate-enabled": {
