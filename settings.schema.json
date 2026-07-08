@@ -436,7 +436,7 @@
     "label": "Orchestrate DBC Updates",
     "user-visible": false,
     "service": "update-service",
-    "default": false,
+    "default": true,
     "example": true
   },
   "updates.dbc.method": {
