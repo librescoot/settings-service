@@ -103,6 +103,9 @@ func (m *Manager) syncConf(name, path string, conns []wgConn) error {
 
 	if nmHas && stored == hash {
 		log.Printf("WireGuard %s up to date, skipping", name)
+		if err := ensureAutoconnect(name); err != nil {
+			log.Printf("Warning: enforce autoconnect on %s: %v", name, err)
+		}
 		return nil
 	}
 
@@ -126,6 +129,25 @@ func (m *Manager) syncConf(name, path string, conns []wgConn) error {
 
 	if err := os.WriteFile(sidecar, []byte(hash), 0600); err != nil {
 		log.Printf("Warning: write sidecar %s: %v", sidecar, err)
+	}
+	if err := ensureAutoconnect(name); err != nil {
+		log.Printf("Warning: enforce autoconnect on %s: %v", name, err)
+	}
+	return nil
+}
+
+// ensureAutoconnect marks the connection for autoconnect with unlimited
+// retries. NM's default gives up after 4 failed activation attempts and only
+// unblocks the profile again minutes later — with the LTE uplink coming up
+// late in boot, early failures (e.g. unresolvable endpoint) turned into
+// multi-minute VPN outages. Applied on every sync so existing connections
+// on deployed devices get fixed without a re-import.
+func ensureAutoconnect(name string) error {
+	out, err := exec.Command("nmcli", "con", "modify", name,
+		"connection.autoconnect", "yes",
+		"connection.autoconnect-retries", "0").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nmcli modify: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
