@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +17,25 @@ import (
 )
 
 var version = "dev"
+
+// notifyReady sends READY=1 on $NOTIFY_SOCKET (sd_notify protocol). No-op
+// when not running under systemd Type=notify. Go's net package maps a
+// leading '@' to the abstract socket namespace, matching systemd's encoding.
+func notifyReady() {
+	socket := os.Getenv("NOTIFY_SOCKET")
+	if socket == "" {
+		return
+	}
+	conn, err := net.Dial("unixgram", socket)
+	if err != nil {
+		log.Printf("sd_notify: dial %s: %v", socket, err)
+		return
+	}
+	defer conn.Close()
+	if _, err := conn.Write([]byte("READY=1")); err != nil {
+		log.Printf("sd_notify: write: %v", err)
+	}
+}
 
 func main() {
 	showVersion := flag.Bool("version", false, "Print version and exit")
@@ -61,6 +81,11 @@ func main() {
 	// the base load (so capture sees real base values) and before WatchSettings
 	// starts so the overlay's own writes hit the no-clobber guard.
 	svc.ReapplyOverlayOnBoot()
+
+	// Tell systemd (Type=notify) the settings hash is seeded. Units ordered
+	// after this service (e.g. Before=librescoot-vehicle.service) rely on the
+	// hash being populated when they start; Redis itself is not persisted.
+	notifyReady()
 
 	// Sync WireGuard from /data/wireguard/ to NetworkManager in the
 	// background. Blocks until NM is up (backoff) — settings-service must
