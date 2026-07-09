@@ -956,6 +956,15 @@
     ],
     "example": "amps"
   },
+  "dashboard.milestone-celebrations": {
+    "type": "bool",
+    "description": "Celebrate odometer milestones (every 500 km) and special-number easter eggs with on-screen confetti and a banner when parking. Disable to turn all milestone celebrations off.",
+    "label": "Milestone Celebrations",
+    "user-visible": true,
+    "service": "scootui",
+    "default": false,
+    "example": true
+  },
   "dashboard.language": {
     "type": "string",
     "description": "Dashboard UI language",
