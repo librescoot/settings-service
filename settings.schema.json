@@ -151,7 +151,7 @@
   },
   "pm.hibernation-timer": {
     "type": "int",
-    "description": "Hibernation timeout in seconds",
+    "description": "Hibernation timeout in seconds (0=disabled). Values between 1 and 299 are clamped up to the 300 second floor.",
     "label": "Hibernation Timer",
     "user-visible": false,
     "service": "pm-service",
