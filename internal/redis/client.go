@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -128,8 +129,12 @@ func (c *Client) SetKey(key, value string) error {
 
 // Close cleanly shuts down the Redis connections
 func (c *Client) Close() {
-	c.pubsub.Close()
-	c.client.Close()
+	if err := c.pubsub.Close(); err != nil {
+		log.Printf("Error closing Redis pubsub: %v", err)
+	}
+	if err := c.client.Close(); err != nil {
+		log.Printf("Error closing Redis client: %v", err)
+	}
 }
 
 // BRPopOverlay blocks until an overlay command is available and returns it.
