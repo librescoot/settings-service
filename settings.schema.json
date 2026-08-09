@@ -937,6 +937,52 @@
     "default": "http://localhost:8002/",
     "example": "http://localhost:8002/"
   },
+  "dashboard.route-preference": {
+    "type": "enum",
+    "description": "How navigation picks a route. Fastest uses travel time, shortest uses raw distance and ignores all other preferences including cobblestone avoidance.",
+    "label": "Route",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "fastest",
+    "values": [
+      {
+        "value": "fastest",
+        "label": "Fastest"
+      },
+      {
+        "value": "shortest",
+        "label": "Shortest"
+      }
+    ],
+    "example": "fastest"
+  },
+  "dashboard.avoid-cobblestone": {
+    "type": "enum",
+    "description": "How hard navigation works to keep off cobblestone and sett. The level is a detour budget: low spends up to as much extra travel time as riding the rough stretch would take, medium four times that, high eight times. Needs routing tiles that classify cobbles; older tiles ignore it. Not applied when the route preference is shortest.",
+    "label": "Avoid Cobblestone",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "medium",
+    "values": [
+      {
+        "value": "off",
+        "label": "Off"
+      },
+      {
+        "value": "low",
+        "label": "Low"
+      },
+      {
+        "value": "medium",
+        "label": "Medium"
+      },
+      {
+        "value": "high",
+        "label": "High"
+      }
+    ],
+    "example": "medium"
+  },
   "dashboard.power-display-mode": {
     "type": "enum",
     "description": "Power display unit",
