@@ -828,7 +828,34 @@
     ],
     "example": "online"
   },
-  "dashboard.map.render-mode": {
+  "dashboard.map.view-mode": {
+    "type": "enum",
+    "description": "Map camera view: 3D (tilted perspective) or 2D (flat top-down)",
+    "label": "Map View",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "3d",
+    "values": [
+      {
+        "value": "3d",
+        "label": "3D"
+      },
+      {
+        "value": "2d",
+        "label": "2D"
+      }
+    ],
+    "example": "2d"
+  },
+  "dashboard.map.north-oriented": {
+    "type": "bool",
+    "description": "In 2D view, keep the map oriented to north instead of following the vehicle heading",
+    "label": "North Oriented",
+    "user-visible": true,
+    "service": "scootui",
+    "default": false
+   },
+   "dashboard.map.render-mode": {
     "type": "enum",
     "description": "Map rendering mode",
     "label": "Map Render Mode",
