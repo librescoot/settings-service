@@ -181,7 +181,7 @@
   },
   "pm.suspend-when-online": {
     "type": "bool",
-    "description": "Allow a locked scooter with a main battery inserted to suspend while it has internet connectivity. When false, it stays awake so cloud commands can still reach it.",
+    "description": "Allow a locked scooter with no main battery present to suspend while it still has connectivity. When false, it stays awake so cloud commands can still reach it. A main battery present or active in either slot blocks suspend regardless of this setting.",
     "label": "Suspend While Online",
     "user-visible": false,
     "service": "pm-service",
