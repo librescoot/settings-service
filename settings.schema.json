@@ -592,15 +592,23 @@
   },
   "dashboard.show-clock": {
     "type": "enum",
-    "description": "Clock visibility",
-    "label": "Show Clock",
+    "description": "Clock format in the status bar (always = time only, kept for compatibility)",
+    "label": "Clock",
     "user-visible": true,
     "service": "scootui",
     "default": "always",
     "values": [
       {
         "value": "always",
-        "label": "Always"
+        "label": "Time"
+      },
+      {
+        "value": "date-time",
+        "label": "Date + Time"
+      },
+      {
+        "value": "alternate",
+        "label": "Alternating"
       },
       {
         "value": "never",
