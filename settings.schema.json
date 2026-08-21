@@ -86,7 +86,7 @@
     "label": "Handlebar Alarm Trigger",
     "user-visible": false,
     "service": "alarm-service",
-    "default": true,
+    "default": false,
     "example": true
   },
   "alarm.trigger.buttons": {
