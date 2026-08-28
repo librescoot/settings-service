@@ -1,6 +1,9 @@
 package service
 
-import "log"
+import (
+	"log"
+	"sort"
+)
 
 // overlayStatusField is the settings-hash field that publishes whether the
 // service overlay is active, for UI consumption.
@@ -51,6 +54,39 @@ func overlayBaseForPersist(settings map[string]string, active bool, base map[str
 			delete(settings, k)
 		}
 	}
+}
+
+// overlayRestorePlan works out what clearing the overlay has to write back:
+// set maps each key to the value it returns to, drop lists the keys that leave
+// the hash entirely. A key captured with a value returns to that value. A key
+// that had none returns to its schema default, or is dropped when the schema
+// declares none. Both slices are ordered so the writes are deterministic.
+func overlayRestorePlan(base map[string]capturedVal, defaults map[string]string) (map[string]string, []string) {
+	set := make(map[string]string, len(base))
+	var drop []string
+	for k, c := range base {
+		if c.existed {
+			set[k] = c.value
+			continue
+		}
+		if def, ok := defaults[k]; ok {
+			set[k] = def
+			continue
+		}
+		drop = append(drop, k)
+	}
+	sort.Strings(drop)
+	return set, drop
+}
+
+// sortedKeys returns m's keys in ascending order.
+func sortedKeys(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // isOverlaid reports whether field is currently forced by the active overlay.
@@ -118,7 +154,17 @@ func (s *SettingsService) ApplyServiceOverlay() error {
 
 // ClearServiceOverlay restores each overridden key to its captured base value
 // (re-establishing user-set membership), clears the active flag, and publishes
-// the status field. Absent-at-capture keys are left as-is.
+// the status field.
+//
+// A key that had no value at capture time is reset to its schema default, or
+// dropped from the hash if it has none. Leaving it at the overlay value, which
+// is what this used to do, means service mode never fully switches off: a
+// stranded dashboard.mode=debug keeps the dashboard on the debug screen, and a
+// stranded scooter.handlebar-unlocked=true keeps the handlebar unlocked. The
+// default is preferred over deletion because LoadSettingsFromTOML hydrates
+// defaults into the hash at boot, so that is the state consumers expect to
+// read, and an absent field leaves stores holding the overlay value with
+// nothing to correct it.
 func (s *SettingsService) ClearServiceOverlay() error {
 	s.mu.Lock()
 	if !s.overlayActive {
@@ -138,13 +184,18 @@ func (s *SettingsService) ClearServiceOverlay() error {
 	if err := saveOverlayActive(false); err != nil {
 		log.Printf("Failed to clear service overlay flag: %v", err)
 	}
-	for k, c := range base {
-		if !c.existed {
-			continue
-		}
-		if err := s.redisClient.SetSettingField(k, c.value); err != nil {
+	var defaults map[string]string
+	if s.schema != nil {
+		defaults = s.schema.Defaults()
+	}
+	set, drop := overlayRestorePlan(base, defaults)
+	for _, k := range sortedKeys(set) {
+		if err := s.redisClient.SetSettingField(k, set[k]); err != nil {
 			log.Printf("Overlay clear: failed to restore %s: %v", k, err)
 		}
+	}
+	if err := s.redisClient.DeleteSettingsFields(drop); err != nil {
+		log.Printf("Overlay clear: failed to drop %v: %v", drop, err)
 	}
 	if err := s.redisClient.SetSettingField(overlayStatusField, "false"); err != nil {
 		log.Printf("Overlay clear: failed to publish status: %v", err)

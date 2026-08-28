@@ -1,6 +1,10 @@
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/librescoot/settings-service/internal/schema"
+)
 
 func TestOverlayShouldPersist(t *testing.T) {
 	cases := []struct {
@@ -88,5 +92,49 @@ func TestHandleOverlaidEdit(t *testing.T) {
 	}
 	if got := s.overlayBase["alarm.enabled"].value; got != "true" {
 		t.Errorf("captured base not updated: %q", got)
+	}
+}
+
+func TestOverlayRestorePlan(t *testing.T) {
+	base := map[string]capturedVal{
+		"alarm.enabled":              {value: "true", existed: true},
+		"dashboard.mode":             {existed: false},
+		"scooter.handlebar-unlocked": {existed: false},
+	}
+	defaults := map[string]string{
+		"dashboard.mode": "speedometer",
+		"alarm.enabled":  "true",
+	}
+
+	set, drop := overlayRestorePlan(base, defaults)
+
+	if set["alarm.enabled"] != "true" {
+		t.Errorf("captured key should return to its captured value, got %q", set["alarm.enabled"])
+	}
+	// The whole point: a key with no pre-overlay value must not keep the
+	// overlay value. With a schema default it goes back to that.
+	if set["dashboard.mode"] != "speedometer" {
+		t.Errorf("absent key should fall back to its schema default, got %q", set["dashboard.mode"])
+	}
+	if _, ok := set["scooter.handlebar-unlocked"]; ok {
+		t.Errorf("absent key with no default must not be written back")
+	}
+	if len(drop) != 1 || drop[0] != "scooter.handlebar-unlocked" {
+		t.Errorf("drop = %v, want [scooter.handlebar-unlocked]", drop)
+	}
+}
+
+func TestOverlayRestorePlanEveryOverlayKeyIsRestorable(t *testing.T) {
+	// Every overlaid key needs a way back even when it was absent at capture,
+	// otherwise clearing service mode leaves it forced forever.
+	s, err := schema.LoadFile("../../settings.schema.json")
+	if err != nil {
+		t.Skipf("schema not readable: %v", err)
+	}
+	defaults := s.Defaults()
+	for k := range serviceOverlayFields() {
+		if _, ok := defaults[k]; !ok {
+			t.Errorf("%s has no schema default, so clearing the overlay can only drop it", k)
+		}
 	}
 }
