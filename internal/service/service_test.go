@@ -106,6 +106,33 @@ func TestTransientKeys(t *testing.T) {
 	}
 }
 
+func TestEqualStringMaps(t *testing.T) {
+	if !equalStringMaps(map[string]string{"a": "1"}, map[string]string{"a": "1"}) {
+		t.Fatal("equal maps should compare equal")
+	}
+	if equalStringMaps(map[string]string{"a": "1"}, map[string]string{"a": "2"}) {
+		t.Fatal("different values should not compare equal")
+	}
+	if equalStringMaps(map[string]string{"a": "1"}, map[string]string{"a": "1", "b": "2"}) {
+		t.Fatal("different keys should not compare equal")
+	}
+	if equalStringMaps(map[string]string{"a": ""}, map[string]string{"b": ""}) {
+		t.Fatal("different empty-valued keys should not compare equal")
+	}
+	if !equalStringMaps(map[string]string{}, nil) {
+		t.Fatal("empty and nil maps should compare equal")
+	}
+}
+
+func TestCloneStringMap(t *testing.T) {
+	original := map[string]string{"alarm.enabled": "true"}
+	clone := cloneStringMap(original)
+	clone["alarm.enabled"] = "false"
+	if original["alarm.enabled"] != "true" {
+		t.Fatal("clone must not share storage with original")
+	}
+}
+
 func TestFilterUserSet(t *testing.T) {
 	tests := []struct {
 		name     string

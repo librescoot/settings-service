@@ -34,6 +34,11 @@ type SettingsService struct {
 	// can be restored on clear. Both guarded by mu.
 	overlayActive bool
 	overlayBase   map[string]capturedVal
+
+	// lastPersisted is the effective user settings from the most recent
+	// successful TOML write. Guarded by mu; it avoids rewriting and logging
+	// the complete settings set for duplicate Redis notifications.
+	lastPersisted map[string]string
 }
 
 // New creates a new settings service instance
@@ -199,28 +204,52 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	// reach the TOML file (no-clobber invariant). Safe here: mu is held.
 	overlayBaseForPersist(settings, s.overlayActive, s.overlayBase)
 
+	persisted := filterUserSet(settings, s.userSetKeys)
+	if equalStringMaps(persisted, s.lastPersisted) {
+		return nil
+	}
+
 	log.Printf("Retrieved %d settings from Redis", len(settings))
 	for k, v := range settings {
 		log.Printf("  %s = %s", k, v)
 	}
 
-	// Log any fields that don't match expected patterns
+	// Log any fields that don't match expected patterns.
 	for field := range settings {
 		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") && !strings.HasPrefix(field, "alarm.") && !strings.HasPrefix(field, "engine-ecu.") && !strings.HasPrefix(field, "keycard.") && !strings.HasPrefix(field, "pm.") {
 			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', 'dashboard.', 'alarm.', 'engine-ecu.', 'keycard.', or 'pm.'", field)
 		}
 	}
 
-	persisted := filterUserSet(settings, s.userSetKeys)
-
 	cfg := config.ParseRedisSettings(persisted)
 	if err := config.SaveToFile(cfg); err != nil {
 		return err
 	}
+	s.lastPersisted = cloneStringMap(persisted)
 
 	log.Printf("Saved %d settings to TOML file (filtered from %d in Redis)", len(persisted), len(settings))
 
 	return nil
+}
+
+func equalStringMaps(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for key, value := range a {
+		if otherValue, ok := b[key]; !ok || otherValue != value {
+			return false
+		}
+	}
+	return true
+}
+
+func cloneStringMap(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
 }
 
 // applyTomlOverlay merges toml-loaded fields into the boot-time Redis
