@@ -5,9 +5,7 @@ import (
 	"os"
 )
 
-// AtomicWrite creates a file atomically by calling writeFn with a temporary file,
-// syncing to disk, then renaming over the target path. This prevents corruption
-// from crashes or power loss during the write.
+// Rename a synced temporary file to avoid corruption on power loss.
 func AtomicWrite(path string, perm os.FileMode, writeFn func(f *os.File) error) error {
 	tmpPath := path + ".tmp"
 

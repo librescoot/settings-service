@@ -54,7 +54,6 @@ func TestParse(t *testing.T) {
 		t.Fatalf("expected 4 settings, got %d", len(s.Settings))
 	}
 
-	// alarm.enabled
 	ae := s.Settings["alarm.enabled"]
 	if ae.Type != "bool" {
 		t.Errorf("alarm.enabled type = %q, want %q", ae.Type, "bool")
@@ -75,7 +74,6 @@ func TestParse(t *testing.T) {
 		t.Errorf("alarm.enabled default = %v, want false", ae.Default)
 	}
 
-	// alarm.duration
 	ad := s.Settings["alarm.duration"]
 	if ad.Type != "int" {
 		t.Errorf("alarm.duration type = %q, want %q", ad.Type, "int")
@@ -96,7 +94,6 @@ func TestParse(t *testing.T) {
 		t.Errorf("alarm.duration default = %v, want 60", ad.Default)
 	}
 
-	// dashboard.theme (enum with values)
 	dt := s.Settings["dashboard.theme"]
 	if dt.Type != "enum" {
 		t.Errorf("dashboard.theme type = %q, want %q", dt.Type, "enum")
@@ -120,7 +117,6 @@ func TestParse(t *testing.T) {
 		t.Errorf("dashboard.theme default = %v, want %q", dt.Default, "dark")
 	}
 
-	// cellular.apn (no default, no label, not user-visible)
 	ca := s.Settings["cellular.apn"]
 	if ca.Type != "string" {
 		t.Errorf("cellular.apn type = %q, want %q", ca.Type, "string")
@@ -213,12 +209,10 @@ func TestTransient(t *testing.T) {
 
 	defaults := s.Defaults()
 
-	// Transient keys without a default are skipped.
 	if _, ok := defaults["updates.mdb.channel"]; ok {
 		t.Error("Defaults() must skip transient keys with no default")
 	}
-	// Transient keys WITH a default are hydrated — that's the whole
-	// point of decoupling the two concerns.
+
 	if defaults["scooter.usb0-policy"] != "auto" {
 		t.Errorf("Defaults()[scooter.usb0-policy] = %q, want \"auto\" (transient + default should hydrate)", defaults["scooter.usb0-policy"])
 	}

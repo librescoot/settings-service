@@ -23,7 +23,6 @@ type Config struct {
 	PM        map[string]interface{} `toml:"pm"`
 }
 
-// LoadFromFile reads the TOML configuration file
 func LoadFromFile() (*Config, error) {
 	if _, err := os.Stat(TomlFilePath); os.IsNotExist(err) {
 		return nil, os.ErrNotExist
@@ -42,7 +41,6 @@ func LoadFromFile() (*Config, error) {
 	return &config, nil
 }
 
-// SaveToFile writes the configuration to the TOML file
 func SaveToFile(config *Config) error {
 	if err := os.MkdirAll(filepath.Dir(TomlFilePath), 0755); err != nil {
 		return fmt.Errorf("failed to create settings directory: %w", err)
@@ -53,7 +51,6 @@ func SaveToFile(config *Config) error {
 	})
 }
 
-// setNested walks segments, creating sub-maps as needed, and stores value at the leaf.
 func setNested(m map[string]interface{}, segments []string, value interface{}) {
 	for i, seg := range segments {
 		if i == len(segments)-1 {
@@ -69,7 +66,6 @@ func setNested(m map[string]interface{}, segments []string, value interface{}) {
 	}
 }
 
-// ParseRedisSettings converts Redis hash fields to Config structure
 func ParseRedisSettings(settings map[string]string) *Config {
 	config := &Config{
 		Scooter:   make(map[string]interface{}),
@@ -114,9 +110,6 @@ func ParseRedisSettings(settings map[string]string) *Config {
 	return config
 }
 
-// flattenSection walks a section map, handling both flat string leaves and
-// nested sub-maps (produced by TOML files that use sub-tables like
-// [dashboard.saved-locations.0]). Emits dotted Redis field names at the leaves.
 func flattenSection(prefix string, m map[string]interface{}, out map[string]interface{}) {
 	for k, v := range m {
 		key := prefix + "." + k
@@ -128,7 +121,6 @@ func flattenSection(prefix string, m map[string]interface{}, out map[string]inte
 	}
 }
 
-// ToRedisFields converts Config to Redis hash fields
 func (c *Config) ToRedisFields() map[string]interface{} {
 	fields := make(map[string]interface{})
 

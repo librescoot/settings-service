@@ -19,7 +19,7 @@ func TestApplyTomlOverlay(t *testing.T) {
 
 	toml := map[string]any{
 		"alarm.enabled":       "true",
-		"updates.mdb.channel": "nightly", // legacy stale value, must be ignored
+		"updates.mdb.channel": "nightly",
 		"updates.dbc.channel": "nightly",
 		"scooter.logserver":   "https://example",
 	}
@@ -61,7 +61,7 @@ func TestApplyTomlOverlay(t *testing.T) {
 }
 
 func TestApplyTomlOverlay_NilSchema(t *testing.T) {
-	// No schema = nothing transient = legacy behavior preserved.
+
 	toml := map[string]any{"updates.mdb.channel": "nightly"}
 	fields := map[string]any{}
 	userSet := map[string]struct{}{}
@@ -215,7 +215,6 @@ func TestMarkUserSet(t *testing.T) {
 		t.Errorf("expected alarm.enabled in userSetKeys after markUserSet")
 	}
 
-	// Idempotent
 	s.markUserSet("alarm.enabled")
 	if len(s.userSetKeys) != 1 {
 		t.Errorf("expected 1 key, got %d", len(s.userSetKeys))

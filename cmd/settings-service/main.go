@@ -18,9 +18,7 @@ import (
 
 var version = "dev"
 
-// notifyReady sends READY=1 on $NOTIFY_SOCKET (sd_notify protocol). No-op
-// when not running under systemd Type=notify. Go's net package maps a
-// leading '@' to the abstract socket namespace, matching systemd's encoding.
+// systemd encodes abstract notification sockets with a leading '@'.
 func notifyReady() {
 	socket := os.Getenv("NOTIFY_SOCKET")
 	if socket == "" {
@@ -72,24 +70,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create settings service: %v", err)
 	}
-	// Load initial settings from TOML file
+
 	if err := svc.LoadSettingsFromTOML(); err != nil {
 		log.Printf("Warning: Failed to load initial settings from TOML: %v", err)
 	}
 
-	// Re-apply the service overlay if it was active before reboot. Done after
-	// the base load (so capture sees real base values) and before WatchSettings
-	// starts so the overlay's own writes hit the no-clobber guard.
 	svc.ReapplyOverlayOnBoot()
 
-	// Tell systemd (Type=notify) the settings hash is seeded. Units ordered
-	// after this service (e.g. Before=librescoot-vehicle.service) rely on the
-	// hash being populated when they start; Redis itself is not persisted.
+	// Notify dependents only after the non-persistent Redis hash is seeded.
 	notifyReady()
 
-	// Sync WireGuard from /data/wireguard/ to NetworkManager in the
-	// background. Blocks until NM is up (backoff) — settings-service must
-	// stay startable early for other services even when NM isn't ready.
 	wgCtx, wgCancel := context.WithCancel(context.Background())
 	wgManager := wireguard.NewManager()
 	go func() {
@@ -98,13 +88,10 @@ func main() {
 		}
 	}()
 
-	// Start watching for Redis updates
 	go svc.WatchSettings()
 
-	// Consume service:overlay apply/clear commands.
 	go svc.RunOverlayConsumer()
 
-	// Setup signal handling
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -115,7 +102,6 @@ func main() {
 
 	wgCancel()
 
-	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

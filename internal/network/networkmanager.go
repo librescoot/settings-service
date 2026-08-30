@@ -13,7 +13,6 @@ import (
 
 const NMConnectionPath = "/etc/NetworkManager/system-connections/wwan.nmconnection"
 
-// GetCurrentAPN reads the current APN from NetworkManager configuration
 func GetCurrentAPN() (string, error) {
 	if _, err := os.Stat(NMConnectionPath); os.IsNotExist(err) {
 		return "", nil
@@ -47,15 +46,13 @@ func GetCurrentAPN() (string, error) {
 	return "", nil
 }
 
-// UpdateAPN updates the APN in the NetworkManager connection file
 func UpdateAPN(apn string) error {
-	// Check if the file exists
+
 	if _, err := os.Stat(NMConnectionPath); os.IsNotExist(err) {
 		log.Printf("NetworkManager connection file %s does not exist, skipping APN update", NMConnectionPath)
 		return nil
 	}
 
-	// Read the existing file
 	content, err := os.ReadFile(NMConnectionPath)
 	if err != nil {
 		return fmt.Errorf("failed to read NetworkManager connection file: %w", err)
@@ -77,7 +74,7 @@ func UpdateAPN(apn string) error {
 
 		if inGsmSection && strings.HasPrefix(trimmed, "[") {
 			if !updated {
-				// [gsm] section exists but has no apn= line; insert before this section header
+
 				newLine := fmt.Sprintf("apn=%s", apn)
 				lines = append(lines[:i], append([]string{newLine}, lines[i:]...)...)
 				updated = true
@@ -92,13 +89,11 @@ func UpdateAPN(apn string) error {
 		}
 	}
 
-	// If we reached EOF while still in the [gsm] section without finding apn=
 	if inGsmSection && !updated {
 		lines = append(lines, fmt.Sprintf("apn=%s", apn))
 		updated = true
 	}
 
-	// No [gsm] section at all — append one
 	if gsmSectionIdx == -1 {
 		lines = append(lines, "", "[gsm]", fmt.Sprintf("apn=%s", apn))
 		updated = true
@@ -118,10 +113,7 @@ func UpdateAPN(apn string) error {
 
 	log.Printf("Updated NetworkManager APN to: %s", apn)
 
-	// Only restart NM if it's already up. On early boot NM may not have
-	// started yet — the new config will be picked up on its own start, and
-	// 'systemctl restart' against an inactive unit just starts it anyway,
-	// but we avoid the noisy failure path and racing with NM's own startup.
+	// Restarting an inactive NetworkManager races its early-boot startup.
 	if !nmready.IsRunning() {
 		log.Println("NetworkManager not running yet, skipping restart; new APN will apply on its first start")
 		return nil

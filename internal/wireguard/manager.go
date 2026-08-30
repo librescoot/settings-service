@@ -16,11 +16,6 @@ import (
 
 var WireGuardConfigDir = "/data/wireguard"
 
-// Manager synchronizes the WireGuard config directory (the UMS-visible source
-// of truth) with NetworkManager. New or changed *.conf files are imported;
-// conf files the user removed cause the matching NM connection to be deleted.
-// A sha256 sidecar per conf (<name>.sha256) records what we last imported
-// so we can re-import only on actual content change.
 type Manager struct {
 	configDir string
 }
@@ -33,8 +28,6 @@ func NewManagerWithOptions(configDir string) *Manager {
 	return &Manager{configDir: configDir}
 }
 
-// Initialize syncs /data/wireguard/ with NetworkManager. Blocks until NM is
-// available (with backoff via nmready.Wait) or ctx is cancelled.
 func (m *Manager) Initialize(ctx context.Context) error {
 	log.Println("Starting WireGuard sync...")
 
@@ -52,8 +45,6 @@ func (m *Manager) Initialize(ctx context.Context) error {
 		return fmt.Errorf("list NM wireguard connections: %w", err)
 	}
 
-	// Orphan cleanup: NM has a WG connection but no matching .conf — user
-	// removed the conf via UMS and expects the tunnel gone.
 	for _, c := range conns {
 		if _, ok := confs[c.name]; ok {
 			continue
@@ -64,12 +55,10 @@ func (m *Manager) Initialize(ctx context.Context) error {
 		}
 	}
 
-	// Drop sidecars for confs that are gone, so a future re-add forces import.
 	if err := m.pruneOrphanSidecars(confs); err != nil {
 		log.Printf("Warning: prune sidecars: %v", err)
 	}
 
-	// Sync each conf.
 	for name, path := range confs {
 		if err := m.syncConf(name, path, conns); err != nil {
 			log.Printf("Warning: sync %s: %v", name, err)
@@ -80,10 +69,6 @@ func (m *Manager) Initialize(ctx context.Context) error {
 	return nil
 }
 
-// syncConf imports `path` if its sha256 differs from the recorded sidecar or
-// if no matching NM connection exists. Existing NM connections with the same
-// name are deleted first to avoid duplicates (nmcli import always creates a
-// new UUID).
 func (m *Manager) syncConf(name, path string, conns []wgConn) error {
 	hash, err := hashFile(path)
 	if err != nil {
@@ -109,9 +94,6 @@ func (m *Manager) syncConf(name, path string, conns []wgConn) error {
 		return nil
 	}
 
-	// Delete any NM connections with this name (could be multiple from a
-	// previous duplicate-import bug). Errors are non-fatal — the import
-	// step will surface a real problem.
 	for _, c := range conns {
 		if c.name != name {
 			continue
@@ -136,12 +118,7 @@ func (m *Manager) syncConf(name, path string, conns []wgConn) error {
 	return nil
 }
 
-// ensureAutoconnect marks the connection for autoconnect with unlimited
-// retries. NM's default gives up after 4 failed activation attempts and only
-// unblocks the profile again minutes later — with the LTE uplink coming up
-// late in boot, early failures (e.g. unresolvable endpoint) turned into
-// multi-minute VPN outages. Applied on every sync so existing connections
-// on deployed devices get fixed without a re-import.
+// NetworkManager's default retry limit can leave late-boot tunnels offline.
 func ensureAutoconnect(name string) error {
 	out, err := exec.Command("nmcli", "con", "modify", name,
 		"connection.autoconnect", "yes",
@@ -152,8 +129,6 @@ func ensureAutoconnect(name string) error {
 	return nil
 }
 
-// listConfs returns map[name]path for every *.conf in the config dir, where
-// name is the basename without the .conf suffix.
 func (m *Manager) listConfs() (map[string]string, error) {
 	out := map[string]string{}
 	if _, err := os.Stat(m.configDir); os.IsNotExist(err) {
@@ -174,7 +149,6 @@ func (m *Manager) sidecarPath(name string) string {
 	return filepath.Join(m.configDir, name+".sha256")
 }
 
-// pruneOrphanSidecars removes <name>.sha256 files whose .conf is gone.
 func (m *Manager) pruneOrphanSidecars(confs map[string]string) error {
 	matches, err := filepath.Glob(filepath.Join(m.configDir, "*.sha256"))
 	if err != nil {
@@ -197,7 +171,6 @@ type wgConn struct {
 	uuid string
 }
 
-// listWireGuardConnections returns all NM connections of type wireguard.
 func listWireGuardConnections() ([]wgConn, error) {
 	out, err := exec.Command("nmcli", "-t", "-f", "NAME,UUID,TYPE", "con", "show").Output()
 	if err != nil {
@@ -209,8 +182,8 @@ func listWireGuardConnections() ([]wgConn, error) {
 		if line == "" {
 			continue
 		}
-		// NAME may contain escaped colons (`\:`). Split from the right so
-		// the last two fields (UUID, TYPE) are always correct.
+
+		// Names may contain escaped colons; UUID and type are the final fields.
 		parts := strings.Split(line, ":")
 		if len(parts) < 3 {
 			continue

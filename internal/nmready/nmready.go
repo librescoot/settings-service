@@ -13,7 +13,6 @@ const (
 	MaxBackoff     = 60 * time.Second
 )
 
-// IsRunning returns true if NetworkManager currently responds as running.
 func IsRunning() bool {
 	cmd := exec.Command("nmcli", "-t", "-f", "RUNNING", "general")
 	out, err := cmd.Output()
@@ -23,9 +22,6 @@ func IsRunning() bool {
 	return strings.TrimSpace(string(out)) == "running"
 }
 
-// Wait blocks until NetworkManager is running or ctx is cancelled. Polls with
-// exponential backoff (starts at InitialBackoff, caps at MaxBackoff). There
-// is no internal timeout — callers control the deadline via ctx.
 func Wait(ctx context.Context) error {
 	if IsRunning() {
 		return nil

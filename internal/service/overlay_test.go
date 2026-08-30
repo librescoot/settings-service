@@ -10,9 +10,9 @@ func TestOverlayShouldPersist(t *testing.T) {
 	cases := []struct {
 		transient, overlaid, want bool
 	}{
-		{false, false, true},  // normal user setting -> persist
-		{true, false, false},  // transient -> never persist
-		{false, true, false},  // overlaid -> never persist (no-clobber)
+		{false, false, true},
+		{true, false, false},
+		{false, true, false},
 		{true, true, false},
 	}
 	for _, c := range cases {
@@ -44,13 +44,13 @@ func TestServiceOverlayFields(t *testing.T) {
 }
 
 func TestOverlayBaseForPersist(t *testing.T) {
-	// inactive: no change
+
 	s := map[string]string{"alarm.enabled": "false"}
 	overlayBaseForPersist(s, false, map[string]capturedVal{"alarm.enabled": {value: "true", existed: true}})
 	if s["alarm.enabled"] != "false" {
 		t.Errorf("inactive should not change map, got %q", s["alarm.enabled"])
 	}
-	// active: overlaid key restored to base value for persistence
+
 	s = map[string]string{"alarm.enabled": "false", "other": "x"}
 	overlayBaseForPersist(s, true, map[string]capturedVal{"alarm.enabled": {value: "true", existed: true}})
 	if s["alarm.enabled"] != "true" {
@@ -59,7 +59,7 @@ func TestOverlayBaseForPersist(t *testing.T) {
 	if s["other"] != "x" {
 		t.Errorf("non-overlaid key must be untouched, got %q", s["other"])
 	}
-	// active, key did not exist pre-overlay: removed from persisted map
+
 	s = map[string]string{"scooter.handlebar-unlocked": "true"}
 	overlayBaseForPersist(s, true, map[string]capturedVal{"scooter.handlebar-unlocked": {existed: false}})
 	if _, ok := s["scooter.handlebar-unlocked"]; ok {
@@ -74,15 +74,13 @@ func TestHandleOverlaidEdit(t *testing.T) {
 			"alarm.enabled": {value: "true", existed: true, wasUserSet: true},
 		},
 	}
-	// User sets alarm.enabled=false while overlay forces it false: same as
-	// overlay value -> our own write, not a user edit.
+
 	reassert, isEdit := s.handleOverlaidEdit("alarm.enabled", "false")
 	if isEdit {
 		t.Errorf("write matching overlay value should not be a user edit")
 	}
 	_ = reassert
-	// User sets alarm.enabled=true (differs from overlay "false") -> user edit:
-	// base updated, overlay value re-asserted.
+
 	reassert, isEdit = s.handleOverlaidEdit("alarm.enabled", "true")
 	if !isEdit {
 		t.Fatal("differing write should be a user edit")
@@ -111,8 +109,7 @@ func TestOverlayRestorePlan(t *testing.T) {
 	if set["alarm.enabled"] != "true" {
 		t.Errorf("captured key should return to its captured value, got %q", set["alarm.enabled"])
 	}
-	// The whole point: a key with no pre-overlay value must not keep the
-	// overlay value. With a schema default it goes back to that.
+
 	if set["dashboard.mode"] != "speedometer" {
 		t.Errorf("absent key should fall back to its schema default, got %q", set["dashboard.mode"])
 	}
@@ -125,8 +122,7 @@ func TestOverlayRestorePlan(t *testing.T) {
 }
 
 func TestOverlayRestorePlanEveryOverlayKeyIsRestorable(t *testing.T) {
-	// Every overlaid key needs a way back even when it was absent at capture,
-	// otherwise clearing service mode leaves it forced forever.
+
 	s, err := schema.LoadFile("../../settings.schema.json")
 	if err != nil {
 		t.Skipf("schema not readable: %v", err)

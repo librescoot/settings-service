@@ -5,28 +5,20 @@ import (
 	"sort"
 )
 
-// overlayStatusField is the settings-hash field that publishes whether the
-// service overlay is active, for UI consumption.
+// overlayStatusField is the UI-visible state of the persistent service overlay.
 const overlayStatusField = "dashboard.service-mode-active"
 
-// capturedVal records a setting's value before the overlay overrode it, so it
-// can be restored verbatim on clear.
 type capturedVal struct {
 	value      string
 	existed    bool
 	wasUserSet bool
 }
 
-// overlayShouldPersist reports whether a changed settings field should be
-// written to /data/settings.toml. Transient keys never persist; keys currently
-// forced by the overlay never persist (no-clobber of the user's base config).
+// Neither runtime-only settings nor forced overlay values may reach TOML.
 func overlayShouldPersist(transient, overlaid bool) bool {
 	return !transient && !overlaid
 }
 
-// serviceOverlayFields returns the fixed set of setting overrides applied
-// while service mode is active. Values are the canonical string forms stored
-// in the Redis settings hash.
 func serviceOverlayFields() map[string]string {
 	return map[string]string{
 		"scooter.auto-standby-seconds": "0",
@@ -39,10 +31,8 @@ func serviceOverlayFields() map[string]string {
 	}
 }
 
-// overlayBaseForPersist rewrites settings so overlaid keys carry their captured
-// base value (or are removed if they did not exist pre-overlay) before the map
-// is persisted to TOML. No-op when the overlay is inactive. Pure: mutates the
-// passed map in place.
+// overlayBaseForPersist substitutes captured values so the overlay never
+// clobbers the user's persisted configuration.
 func overlayBaseForPersist(settings map[string]string, active bool, base map[string]capturedVal) {
 	if !active {
 		return
@@ -56,11 +46,7 @@ func overlayBaseForPersist(settings map[string]string, active bool, base map[str
 	}
 }
 
-// overlayRestorePlan works out what clearing the overlay has to write back:
-// set maps each key to the value it returns to, drop lists the keys that leave
-// the hash entirely. A key captured with a value returns to that value. A key
-// that had none returns to its schema default, or is dropped when the schema
-// declares none. Both slices are ordered so the writes are deterministic.
+// Absent pre-overlay values return to their default, or leave the hash entirely.
 func overlayRestorePlan(base map[string]capturedVal, defaults map[string]string) (map[string]string, []string) {
 	set := make(map[string]string, len(base))
 	var drop []string
@@ -79,7 +65,6 @@ func overlayRestorePlan(base map[string]capturedVal, defaults map[string]string)
 	return set, drop
 }
 
-// sortedKeys returns m's keys in ascending order.
 func sortedKeys(m map[string]string) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
@@ -89,7 +74,6 @@ func sortedKeys(m map[string]string) []string {
 	return out
 }
 
-// isOverlaid reports whether field is currently forced by the active overlay.
 func (s *SettingsService) isOverlaid(field string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -100,18 +84,12 @@ func (s *SettingsService) isOverlaid(field string) bool {
 	return ok
 }
 
-// ApplyServiceOverlay captures the current base value of each overridden key,
-// writes the overlay values to the live settings hash (publishing each so
-// consumers react), persists the active flag, and publishes the status field.
-// Overlay writes never reach /data/settings.toml because WatchSettings skips
-// persistence for overlaid keys (see overlayShouldPersist / isOverlaid).
+// ApplyServiceOverlay captures the base before forcing effective service-mode values.
 func (s *SettingsService) ApplyServiceOverlay() error {
 	overlay := serviceOverlayFields()
 
-	// Capture current values without holding the lock — Redis I/O must not
-	// block other goroutines that need mu (e.g. WatchSettings).
 	type rawVal struct {
-		value  string
+		value   string
 		existed bool
 	}
 	captured := make(map[string]rawVal, len(overlay))
@@ -152,19 +130,8 @@ func (s *SettingsService) ApplyServiceOverlay() error {
 	return nil
 }
 
-// ClearServiceOverlay restores each overridden key to its captured base value
-// (re-establishing user-set membership), clears the active flag, and publishes
-// the status field.
-//
-// A key that had no value at capture time is reset to its schema default, or
-// dropped from the hash if it has none. Leaving it at the overlay value, which
-// is what this used to do, means service mode never fully switches off: a
-// stranded dashboard.mode=debug keeps the dashboard on the debug screen, and a
-// stranded scooter.handlebar-unlocked=true keeps the handlebar unlocked. The
-// default is preferred over deletion because LoadSettingsFromTOML hydrates
-// defaults into the hash at boot, so that is the state consumers expect to
-// read, and an absent field leaves stores holding the overlay value with
-// nothing to correct it.
+// ClearServiceOverlay restores captured membership and values so no forced setting
+// survives service mode (notably handlebar unlock and dashboard debug mode).
 func (s *SettingsService) ClearServiceOverlay() error {
 	s.mu.Lock()
 	if !s.overlayActive {
@@ -207,8 +174,6 @@ func (s *SettingsService) ClearServiceOverlay() error {
 	return nil
 }
 
-// RunOverlayConsumer blocks on the settings:overlay list and dispatches
-// apply/clear commands. Intended to run in its own goroutine.
 func (s *SettingsService) RunOverlayConsumer() {
 	for {
 		select {
@@ -239,8 +204,7 @@ func (s *SettingsService) RunOverlayConsumer() {
 	}
 }
 
-// ReapplyOverlayOnBoot re-applies the service overlay if it was active before a
-// reboot. Call after the base settings are loaded into Redis.
+// ReapplyOverlayOnBoot restores the persisted mode after Redis is rehydrated.
 func (s *SettingsService) ReapplyOverlayOnBoot() {
 	if loadOverlayActive() {
 		log.Printf("Service overlay was active before reboot; re-applying")
@@ -250,11 +214,8 @@ func (s *SettingsService) ReapplyOverlayOnBoot() {
 	}
 }
 
-// handleOverlaidEdit reconciles a change to an overlaid key observed on the
-// settings channel. If newValue matches the overlay's forced value it is our
-// own write (isUserEdit=false). Otherwise it is a genuine user edit: the
-// captured base is updated so it surfaces on clear, and reassert returns the
-// overlay value the caller must re-write to keep the effective value overridden.
+// handleOverlaidEdit records a user change as the future base, then tells the
+// watcher to reassert the active overlay. Its own matching writes are ignored.
 func (s *SettingsService) handleOverlaidEdit(field, newValue string) (reassert string, isUserEdit bool) {
 	overlayVal := serviceOverlayFields()[field]
 	if newValue == overlayVal {
@@ -271,7 +232,6 @@ func (s *SettingsService) handleOverlaidEdit(field, newValue string) (reassert s
 	return overlayVal, true
 }
 
-// currentFieldValue reads the live settings-hash value of field (empty if absent).
 func (s *SettingsService) currentFieldValue(field string) string {
 	v, _, err := s.redisClient.GetSettingField(field)
 	if err != nil {
