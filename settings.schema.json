@@ -590,6 +590,42 @@
     "default": false,
     "example": true
   },
+  "dashboard.speedometer.max-speed": {
+    "type": "int",
+    "description": "Full-scale value of the speedometer arc in km/h. The arc keeps its size; the tick labels and the range it covers follow this value.",
+    "label": "Speedometer Scale",
+    "user-visible": false,
+    "service": "scootui",
+    "default": 60,
+    "unit": "km/h",
+    "min": 20,
+    "max": 200,
+    "example": 80
+  },
+  "dashboard.speedometer.warn-speed": {
+    "type": "int",
+    "description": "Speed in km/h from which the speedometer fill shifts from blue towards purple. Must be below dashboard.speedometer.overspeed.",
+    "label": "Speedometer Warning Speed",
+    "user-visible": false,
+    "service": "scootui",
+    "default": 55,
+    "unit": "km/h",
+    "min": 1,
+    "max": 200,
+    "example": 70
+  },
+  "dashboard.speedometer.overspeed": {
+    "type": "int",
+    "description": "Speed in km/h above which the speedometer fill pulses purple and pink.",
+    "label": "Speedometer Overspeed",
+    "user-visible": false,
+    "service": "scootui",
+    "default": 60,
+    "unit": "km/h",
+    "min": 1,
+    "max": 200,
+    "example": 75
+  },
   "dashboard.show-clock": {
     "type": "enum",
     "description": "Clock format in the status bar (always = time only, kept for compatibility)",
