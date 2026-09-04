@@ -676,6 +676,64 @@
     ],
     "example": "warning"
   },
+  "dashboard.show-road-name": {
+    "type": "enum",
+    "description": "Road name pill visibility on the cluster and map (map = map screen only, navigating = only while a route is active)",
+    "label": "Road Name",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "always",
+    "values": [
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "map",
+        "label": "Map Only"
+      },
+      {
+        "value": "navigating",
+        "label": "When Navigating"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
+    ],
+    "example": "always"
+  },
+  "dashboard.show-speed-limit": {
+    "type": "enum",
+    "description": "Speed limit sign visibility on the cluster and map (map = map screen only, navigating = only while a route is active, over-limit = only while exceeding the posted limit)",
+    "label": "Speed Limit",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "always",
+    "values": [
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "map",
+        "label": "Map Only"
+      },
+      {
+        "value": "navigating",
+        "label": "When Navigating"
+      },
+      {
+        "value": "over-limit",
+        "label": "Over Limit"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
+    ],
+    "example": "always"
+  },
   "dashboard.show-gps": {
     "type": "enum",
     "description": "GPS indicator visibility",
@@ -898,8 +956,8 @@
     "user-visible": true,
     "service": "scootui",
     "default": false
-   },
-   "dashboard.map.render-mode": {
+  },
+  "dashboard.map.render-mode": {
     "type": "enum",
     "description": "Map rendering mode",
     "label": "Map Render Mode",
