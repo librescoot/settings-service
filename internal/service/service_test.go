@@ -190,6 +190,49 @@ func TestFilterUserSet(t *testing.T) {
 				"b": "2",
 			},
 		},
+		{
+			name: "saved location notification keeps the complete record",
+			settings: map[string]string{
+				"dashboard.saved-locations.2.label":     "Home",
+				"dashboard.saved-locations.2.latitude":  "52.52",
+				"dashboard.saved-locations.2.longitude": "13.405",
+				"dashboard.saved-locations.3.label":     "Work",
+				"dashboard.theme":                       "dark",
+			},
+			userSet: map[string]struct{}{
+				"dashboard.saved-locations.2": {},
+			},
+			want: map[string]string{
+				"dashboard.saved-locations.2.label":     "Home",
+				"dashboard.saved-locations.2.latitude":  "52.52",
+				"dashboard.saved-locations.2.longitude": "13.405",
+			},
+		},
+		{
+			name: "recent destination notification keeps the complete record",
+			settings: map[string]string{
+				"dashboard.recent-destinations.0.label":   "Park",
+				"dashboard.recent-destinations.0.used-at": "2026-09-06T10:00:00Z",
+			},
+			userSet: map[string]struct{}{
+				"dashboard.recent-destinations.0": {},
+			},
+			want: map[string]string{
+				"dashboard.recent-destinations.0.label":   "Park",
+				"dashboard.recent-destinations.0.used-at": "2026-09-06T10:00:00Z",
+			},
+		},
+		{
+			name:     "saved location deletion drops the persisted record",
+			settings: map[string]string{},
+			userSet: map[string]struct{}{
+				"dashboard.saved-locations.1":           {},
+				"dashboard.saved-locations.1.label":     {},
+				"dashboard.saved-locations.1.latitude":  {},
+				"dashboard.saved-locations.1.longitude": {},
+			},
+			want: map[string]string{},
+		},
 	}
 
 	for _, tt := range tests {

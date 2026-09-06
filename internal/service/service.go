@@ -252,8 +252,39 @@ func filterUserSet(settings map[string]string, userSetKeys map[string]struct{}) 
 		if v, ok := settings[k]; ok {
 			out[k] = v
 		}
+		// Indexed records publish their record prefix after all fields are written.
+		if isIndexedRecordNotification(k) {
+			prefix := k + "."
+			for field, value := range settings {
+				if strings.HasPrefix(field, prefix) {
+					out[field] = value
+				}
+			}
+		}
 	}
 	return out
+}
+
+func isIndexedRecordNotification(key string) bool {
+	for _, prefix := range []string{
+		"dashboard.saved-locations.",
+		"dashboard.recent-destinations.",
+	} {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		index := strings.TrimPrefix(key, prefix)
+		if index == "" {
+			return false
+		}
+		for _, r := range index {
+			if r < '0' || r > '9' {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (s *SettingsService) markUserSet(field string) {
