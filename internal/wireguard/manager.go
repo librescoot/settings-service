@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/librescoot/settings-service/internal/nmready"
 )
@@ -17,15 +18,27 @@ import (
 var WireGuardConfigDir = "/data/wireguard"
 
 type Manager struct {
-	configDir string
+	configDir    string
+	activate     func(context.Context, string) error
+	initialRetry time.Duration
+	maximumRetry time.Duration
 }
 
 func NewManager() *Manager {
-	return &Manager{configDir: WireGuardConfigDir}
+	return newManager(WireGuardConfigDir)
 }
 
 func NewManagerWithOptions(configDir string) *Manager {
-	return &Manager{configDir: configDir}
+	return newManager(configDir)
+}
+
+func newManager(configDir string) *Manager {
+	return &Manager{
+		configDir:    configDir,
+		activate:     activateConnection,
+		initialRetry: 2 * time.Second,
+		maximumRetry: 60 * time.Second,
+	}
 }
 
 func (m *Manager) Initialize(ctx context.Context) error {
@@ -59,13 +72,64 @@ func (m *Manager) Initialize(ctx context.Context) error {
 		log.Printf("Warning: prune sidecars: %v", err)
 	}
 
+	var profiles []string
 	for name, path := range confs {
 		if err := m.syncConf(name, path, conns); err != nil {
 			log.Printf("Warning: sync %s: %v", name, err)
+			continue
 		}
+		profiles = append(profiles, name)
 	}
 
 	log.Println("WireGuard sync completed")
+	return m.activateProfiles(ctx, profiles)
+}
+
+func (m *Manager) activateProfiles(ctx context.Context, profiles []string) error {
+	pending := make(map[string]struct{}, len(profiles))
+	for _, name := range profiles {
+		pending[name] = struct{}{}
+	}
+
+	retry := m.initialRetry
+	for len(pending) > 0 {
+		for name := range pending {
+			if err := m.activate(ctx, name); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				log.Printf("WireGuard %s activation failed, retrying: %v", name, err)
+				continue
+			}
+			log.Printf("WireGuard %s activated", name)
+			delete(pending, name)
+		}
+		if len(pending) == 0 {
+			return nil
+		}
+
+		timer := time.NewTimer(retry)
+		select {
+		case <-timer.C:
+			if retry < m.maximumRetry {
+				retry *= 2
+				if retry > m.maximumRetry {
+					retry = m.maximumRetry
+				}
+			}
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+func activateConnection(ctx context.Context, name string) error {
+	out, err := exec.CommandContext(ctx, "nmcli", "--wait", "20", "connection", "up", "id", name).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("nmcli connection up: %w: %s", err, strings.TrimSpace(string(out)))
+	}
 	return nil
 }
 
