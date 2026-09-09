@@ -160,6 +160,16 @@
     "min": 0,
     "example": 432000
   },
+  "pm.last-ditch-hibernate-enabled": {
+    "type": "bool",
+    "description": "Enable automatic last-ditch hibernation when reserve power is critically low. Disable only for controlled batteryless bench operation; explicit and scheduled power commands remain available.",
+    "label": "Last-Ditch Hibernation",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": true,
+    "transient": true,
+    "example": false
+  },
   "pm.default-state": {
     "type": "enum",
     "description": "Default power target state when idle. 'run' keeps the system awake, 'suspend' triggers auto-suspend after the pre-suspend delay.",
