@@ -209,7 +209,7 @@
   },
   "pm.scheduled-hibernate-cron": {
     "type": "string",
-    "description": "5-field cron expression (minute hour day-of-month month day-of-week) defining when scheduled hibernation fires. Empty disables.",
+    "description": "5-field cron expression (minute hour day-of-month month day-of-week) defining when scheduled hibernation fires. Empty disables. Expressions whose consecutive occurrences are closer than 15 minutes (e.g. '* * * * *') are rejected, because they cannot be told apart from a hibernate/wake loop across poweroffs.",
     "label": "Scheduled Hibernation Cron",
     "user-visible": false,
     "service": "pm-service",
