@@ -1,38 +1,44 @@
 {
   "alarm.enabled": {
     "type": "bool",
-    "description": "Enable or disable the alarm system",
-    "label": "Alarm",
+    "description": "Enable or disable the alarm system.",
+    "label": "Alarm System",
     "user-visible": true,
     "service": "alarm-service",
     "default": true,
     "example": true
   },
-  "alarm.honk": {
+  "alarm.seatbox-trigger": {
     "type": "bool",
-    "description": "Enable horn during alarm trigger",
-    "label": "Alarm Horn",
-    "user-visible": true,
+    "description": "Trigger the alarm when the seatbox is opened without authorization.",
+    "label": "Trigger on Unauthorized Seatbox Opening",
+    "user-visible": false,
+    "service": "alarm-service",
+    "default": true,
+    "example": true
+  },
+  "alarm.trigger.motion": {
+    "type": "bool",
+    "description": "Use BMX055 motion events as an alarm trigger source.",
+    "label": "Trigger on Motion",
+    "user-visible": false,
+    "service": "alarm-service",
+    "default": true,
+    "example": true
+  },
+  "alarm.trigger.handlebar": {
+    "type": "bool",
+    "description": "Trigger the alarm when the handlebar lock sensor or position changes.",
+    "label": "Trigger on Handlebar Movement",
+    "user-visible": false,
     "service": "alarm-service",
     "default": false,
     "example": true
   },
-  "alarm.duration": {
-    "type": "int",
-    "description": "Duration in seconds for alarm sound",
-    "label": "Alarm Duration",
-    "user-visible": true,
-    "service": "alarm-service",
-    "default": 30,
-    "unit": "seconds",
-    "min": 0,
-    "max": 300,
-    "example": 60
-  },
-  "alarm.seatbox-trigger": {
+  "alarm.trigger.buttons": {
     "type": "bool",
-    "description": "Trigger alarm on unauthorized seatbox opening",
-    "label": "Seatbox Alarm Trigger",
+    "description": "Trigger the alarm when a brake, horn, or seatbox button is pressed.",
+    "label": "Trigger on Button Presses",
     "user-visible": false,
     "service": "alarm-service",
     "default": true,
@@ -40,8 +46,8 @@
   },
   "alarm.hairtrigger": {
     "type": "bool",
-    "description": "Enable hair trigger mode (immediate short alarm on first motion)",
-    "label": "Hair Trigger",
+    "description": "Sound a short alarm immediately after the first detected motion.",
+    "label": "Immediate First-Motion Alarm",
     "user-visible": false,
     "service": "alarm-service",
     "default": false,
@@ -49,8 +55,8 @@
   },
   "alarm.hairtrigger-duration": {
     "type": "int",
-    "description": "Duration in seconds for hair trigger alarm",
-    "label": "Hair Trigger Duration",
+    "description": "Set how long the immediate first-motion alarm remains active.",
+    "label": "Immediate Alarm Duration",
     "user-visible": false,
     "service": "alarm-service",
     "default": 3,
@@ -61,8 +67,8 @@
   },
   "alarm.l1-cooldown": {
     "type": "int",
-    "description": "Level 1 cooldown duration in seconds",
-    "label": "L1 Cooldown Duration",
+    "description": "Set how long alarm-service waits after the first motion event before starting the level 1 motion check.",
+    "label": "Level 1 Trigger Delay",
     "user-visible": false,
     "service": "alarm-service",
     "default": 15,
@@ -71,46 +77,31 @@
     "max": 60,
     "example": 15
   },
-  "alarm.trigger.motion": {
+  "alarm.honk": {
     "type": "bool",
-    "description": "Enable BMX055 motion as an alarm trigger source",
-    "label": "Motion Alarm Trigger",
-    "user-visible": false,
-    "service": "alarm-service",
-    "default": true,
-    "example": true
-  },
-  "alarm.trigger.handlebar": {
-    "type": "bool",
-    "description": "Enable handlebar lock-sensor / position as an alarm trigger source",
-    "label": "Handlebar Alarm Trigger",
-    "user-visible": false,
+    "description": "Sound the horn when the alarm is triggered.",
+    "label": "Horn During Alarm",
+    "user-visible": true,
     "service": "alarm-service",
     "default": false,
     "example": true
   },
-  "alarm.trigger.buttons": {
-    "type": "bool",
-    "description": "Enable brake/horn/seatbox button presses as an alarm trigger source",
-    "label": "Buttons Alarm Trigger",
-    "user-visible": false,
+  "alarm.duration": {
+    "type": "int",
+    "description": "Set how long a triggered alarm remains active.",
+    "label": "Alarm Duration",
+    "user-visible": true,
     "service": "alarm-service",
-    "default": true,
-    "example": true
-  },
-  "scooter.battery-keep-active-on-seatbox-open": {
-    "type": "bool",
-    "description": "Keep a running battery active when the seatbox opens instead of deactivating it",
-    "label": "Keep Battery Active On Seatbox Open",
-    "user-visible": false,
-    "service": "battery-service",
-    "default": false,
-    "example": false
+    "default": 30,
+    "unit": "seconds",
+    "min": 0,
+    "max": 300,
+    "example": 60
   },
   "scooter.dual-battery": {
     "type": "bool",
-    "description": "Enable dual battery mode (battery 1 active instead of idle)",
-    "label": "Dual Battery Mode",
+    "description": "Use both installed main batteries when dual-battery hardware is available.",
+    "label": "Dual-Battery Mode",
     "user-visible": true,
     "service": "battery-service",
     "default": false,
@@ -118,8 +109,8 @@
   },
   "scooter.max-voltage-delta": {
     "type": "int",
-    "description": "Maximum voltage delta between batteries for dual battery activation (0 to disable)",
-    "label": "Max Battery Voltage Delta",
+    "description": "Set the maximum voltage difference allowed when activating both batteries. Set to zero to disable the voltage-difference limit.",
+    "label": "Maximum Battery Voltage Difference",
     "user-visible": false,
     "service": "battery-service",
     "default": 1000,
@@ -127,10 +118,19 @@
     "min": 0,
     "example": 1000
   },
+  "scooter.battery-keep-active-on-seatbox-open": {
+    "type": "bool",
+    "description": "Keep the currently active main battery running when the seatbox opens instead of deactivating it.",
+    "label": "Keep Active Battery on Seatbox Open",
+    "user-visible": false,
+    "service": "battery-service",
+    "default": false,
+    "example": false
+  },
   "scooter.battery-aux-low-keep-active-enter-mv": {
     "type": "int",
-    "description": "Aux battery voltage (mV) below which the keep-active-on-seatbox-open override engages automatically",
-    "label": "Aux-Low Keep-Active Enter Threshold",
+    "description": "Set the AUX battery voltage below which the keep-active-on-seatbox-open override engages automatically.",
+    "label": "AUX-Low Keep-Active Enter Threshold",
     "user-visible": false,
     "service": "battery-service",
     "default": 11500,
@@ -140,8 +140,8 @@
   },
   "scooter.battery-aux-low-keep-active-exit-mv": {
     "type": "int",
-    "description": "Aux battery voltage (mV) at or above which the aux-low keep-active override disengages (must be > enter threshold)",
-    "label": "Aux-Low Keep-Active Exit Threshold",
+    "description": "Set the AUX battery voltage at or above which the AUX-low keep-active override disengages. This must be greater than the enter threshold.",
+    "label": "AUX-Low Keep-Active Exit Threshold",
     "user-visible": false,
     "service": "battery-service",
     "default": 12000,
@@ -149,109 +149,10 @@
     "min": 0,
     "example": 12000
   },
-  "pm.hibernation-timer": {
-    "type": "int",
-    "description": "Hibernation timeout in seconds (0=disabled). Values between 1 and 299 are clamped up to the 300 second floor.",
-    "label": "Hibernation Timer",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": 259200,
-    "unit": "seconds",
-    "min": 0,
-    "example": 432000
-  },
-  "pm.last-ditch-hibernate-enabled": {
-    "type": "bool",
-    "description": "Enable automatic last-ditch hibernation when reserve power is critically low. Disable only for controlled batteryless bench operation; explicit and scheduled power commands remain available.",
-    "label": "Last-Ditch Hibernation",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": true,
-    "transient": true,
-    "example": false
-  },
-  "pm.default-state": {
-    "type": "enum",
-    "description": "Default power target state when idle. 'run' keeps the system awake, 'suspend' triggers auto-suspend after the pre-suspend delay.",
-    "label": "Default Power State",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": "suspend",
-    "values": [
-      {
-        "value": "run",
-        "label": "Run (stay awake)"
-      },
-      {
-        "value": "suspend",
-        "label": "Suspend (auto-sleep)"
-      }
-    ],
-    "example": "suspend"
-  },
-  "pm.suspend-when-online": {
-    "type": "bool",
-    "description": "Allow a locked scooter with no main battery present to suspend while it still has connectivity. When false, it stays awake so cloud commands can still reach it. A main battery present or active in either slot blocks suspend regardless of this setting.",
-    "label": "Suspend While Online",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": true,
-    "example": false
-  },
-  "pm.scheduled-hibernate-enabled": {
-    "type": "bool",
-    "description": "Enable scheduled hibernation defined by pm.scheduled-hibernate-cron and pm.scheduled-hibernate-duration",
-    "label": "Scheduled Hibernation",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": false,
-    "example": true
-  },
-  "pm.scheduled-hibernate-cron": {
-    "type": "string",
-    "description": "5-field cron expression (minute hour day-of-month month day-of-week) defining when scheduled hibernation fires. Empty disables. Expressions whose consecutive occurrences are closer than 15 minutes (e.g. '* * * * *') are rejected, because they cannot be told apart from a hibernate/wake loop across poweroffs.",
-    "label": "Scheduled Hibernation Cron",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": "",
-    "example": "0 22 * * *"
-  },
-  "pm.scheduled-hibernate-duration": {
-    "type": "duration",
-    "description": "How long the scheduled hibernation should last. The system wakes at fire-time + this duration (wall-clock target wake time).",
-    "label": "Scheduled Hibernation Duration",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": "0s",
-    "min": 0,
-    "example": "8h"
-  },
-  "pm.wake-timer-max-seconds": {
-    "type": "int",
-    "description": "Safety cap on the wake-timer duration sent to the nRF52. Requests above this value are clamped.",
-    "label": "Wake Timer Max",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": 604800,
-    "unit": "seconds",
-    "min": 60,
-    "max": 604800,
-    "example": 604800
-  },
-  "pm.wake-timer-ack-timeout": {
-    "type": "duration",
-    "description": "How long pm-service waits for the nRF52 to confirm a wake-timer was armed before aborting hibernation",
-    "label": "Wake Timer Ack Timeout",
-    "user-visible": false,
-    "service": "pm-service",
-    "default": "10s",
-    "min": 0,
-    "example": "10s"
-  },
   "scooter.auto-standby-seconds": {
     "type": "int",
-    "description": "Auto-lock timeout when parked in seconds (0=disabled)",
-    "label": "Auto Standby Timeout",
+    "description": "Set the inactivity time before a parked scooter enters standby and locks. Set to zero to disable automatic standby.",
+    "label": "Automatic Standby Delay",
     "user-visible": false,
     "service": "vehicle-service",
     "default": 900,
@@ -261,8 +162,8 @@
   },
   "scooter.lock-on-bluetooth-disconnect-seconds": {
     "type": "int",
-    "description": "Grace period in seconds before locking the scooter after the connected phone disconnects while parked (0=disabled)",
-    "label": "Lock on Bluetooth disconnect",
+    "description": "Set the delay before a parked scooter locks after the connected phone disconnects. Set to zero to disable this behavior.",
+    "label": "Bluetooth Disconnect Lock Delay",
     "user-visible": false,
     "service": "vehicle-service",
     "default": 0,
@@ -272,8 +173,8 @@
   },
   "scooter.brake-hibernation": {
     "type": "enum",
-    "description": "Enable brake lever hibernation",
-    "label": "Brake Hibernation",
+    "description": "Allow hibernation to be initiated by holding both brake levers while parked.",
+    "label": "Brake-Hold Hibernation",
     "user-visible": false,
     "service": "vehicle-service",
     "default": "enabled",
@@ -289,39 +190,54 @@
     ],
     "example": "enabled"
   },
-  "scooter.usb0-policy": {
-    "type": "enum",
-    "description": "MDB to DBC USB link behavior. auto brings usb0 down when the scooter is in standby (default). always-on keeps usb0 up regardless of dashboard state for installer/diag reachability \u2014 transient, so the override lasts only until the next reboot.",
-    "label": "USB Link Policy",
-    "user-visible": false,
-    "service": "vehicle-service",
-    "default": "auto",
-    "transient": true,
-    "values": [
-      {
-        "value": "always-on",
-        "label": "Always On"
-      },
-      {
-        "value": "auto",
-        "label": "Auto (track dashboard)"
-      }
-    ],
-    "example": "always-on"
-  },
   "scooter.handlebar-unlocked": {
     "type": "bool",
-    "description": "When true, the handlebar lock latch is released and auto re-lock is suppressed. Set by the service-mode overlay; transient so it never persists.",
-    "label": "Handlebar Unlocked",
+    "description": "Release the handlebar-lock latch and suppress automatic relocking while the service-mode overlay is active. This setting is transient.",
+    "label": "Force Handlebar Unlocked",
     "user-visible": false,
     "service": "vehicle-service",
     "default": false,
     "transient": true,
     "example": true
   },
+  "scooter.enable-horn": {
+    "type": "enum",
+    "description": "Choose whether the manual horn is always available, available only in drive mode, or disabled.",
+    "label": "Horn Availability",
+    "user-visible": false,
+    "service": "vehicle-service",
+    "default": "true",
+    "values": [
+      {
+        "value": "true",
+        "label": "Always Available",
+        "description": "Allow the manual horn in every vehicle state."
+      },
+      {
+        "value": "false",
+        "label": "Disabled",
+        "description": "Disable the manual horn."
+      },
+      {
+        "value": "in-drive",
+        "label": "Drive Mode Only",
+        "description": "Allow the manual horn only while the scooter is in drive mode."
+      }
+    ],
+    "example": "in-drive"
+  },
+  "scooter.horn-when-seatbox-open": {
+    "type": "bool",
+    "description": "Allow the horn button to work while the scooter is unlocked and the seatbox is open. By default, it is disabled to prevent the open seat lid from pressing the button and sounding the horn.",
+    "label": "Horn with Seatbox Open",
+    "user-visible": true,
+    "service": "vehicle-service",
+    "default": false,
+    "example": true
+  },
   "scooter.dbc-blinker-led": {
     "type": "enum",
-    "description": "Blink DBC boot LED in sync with blinkers (green for single, red for hazards)",
+    "description": "Flash the DBC boot LED with the blinkers: green for individual blinkers and red for hazards.",
     "label": "DBC Blinker LED",
     "user-visible": true,
     "service": "vehicle-service",
@@ -338,200 +254,159 @@
     ],
     "example": "enabled"
   },
-  "scooter.enable-horn": {
+  "scooter.usb0-policy": {
     "type": "enum",
-    "description": "Horn enable mode",
-    "label": "Horn",
+    "description": "Control whether USB follows dashboard power or remains available for SSH and Update Mode. The always-on override is transient and lasts until reboot.",
+    "label": "USB Policy",
     "user-visible": false,
     "service": "vehicle-service",
-    "default": "true",
-    "values": [
-      {
-        "value": "true",
-        "label": "Always"
-      },
-      {
-        "value": "false",
-        "label": "Disabled"
-      },
-      {
-        "value": "in-drive",
-        "label": "In Drive Only"
-      }
-    ],
-    "example": "in-drive"
-  },
-  "scooter.horn-when-seatbox-open": {
-    "type": "bool",
-    "description": "Allow the manual horn button to sound while the seatbox is open and the scooter is unlocked. Disabled by default so the open seat lid resting on the button does not honk.",
-    "label": "Horn While Seatbox Open",
-    "user-visible": true,
-    "service": "vehicle-service",
-    "default": false,
-    "example": true
-  },
-  "updates.mdb.method": {
-    "type": "enum",
-    "description": "Update method for MDB",
-    "label": "MDB Update Method",
-    "user-visible": true,
-    "service": "update-service",
-    "default": "delta",
-    "values": [
-      {
-        "value": "delta",
-        "label": "Delta"
-      },
-      {
-        "value": "full",
-        "label": "Full"
-      }
-    ],
-    "example": "full"
-  },
-  "updates.mdb.channel": {
-    "type": "enum",
-    "description": "Release channel override for MDB. Transient: lives in Redis only; on reboot update-service falls back to the channel inferred from the installed image.",
-    "label": "MDB Release Channel",
-    "user-visible": true,
-    "service": "update-service",
-    "default": null,
+    "default": "auto",
     "transient": true,
     "values": [
       {
-        "value": "stable",
-        "label": "Stable"
+        "value": "always-on",
+        "label": "Always Available",
+        "description": "Keep USB available for SSH and Update Mode until reboot."
       },
       {
-        "value": "testing",
-        "label": "Testing"
-      },
-      {
-        "value": "nightly",
-        "label": "Nightly"
+        "value": "auto",
+        "label": "Follow Dashboard Power",
+        "description": "Bring USB down while the dashboard is off in standby."
       }
     ],
-    "example": "stable"
+    "example": "always-on"
   },
-  "updates.mdb.check-interval": {
-    "type": "duration",
-    "description": "Time between update checks for MDB (0 to disable)",
-    "label": "MDB Update Check Interval",
-    "user-visible": true,
-    "service": "update-service",
-    "default": "6h",
-    "min": 0,
-    "example": "12h"
-  },
-  "updates.mdb.last-check-time": {
-    "type": "string",
-    "description": "Last time MDB checked for updates (ISO8601 timestamp)",
-    "label": "MDB Last Update Check",
+  "scooter.logserver": {
+    "type": "url",
+    "description": "Set the systemd-journal-remote endpoint used to upload journal entries. An unset or empty value disables log uploads.",
+    "label": "Log Server URL",
     "user-visible": false,
-    "service": "update-service",
-    "example": "2025-01-15T10:30:00Z"
+    "service": "settings-service",
+    "example": "http://logs.example.com:19532"
   },
-  "updates.mdb.dry-run": {
+  "pm.default-state": {
+    "type": "enum",
+    "description": "Set the default power state used while the system is idle.",
+    "label": "Idle Power State",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "suspend",
+    "values": [
+      {
+        "value": "run",
+        "label": "Stay Awake (run)",
+        "description": "Keep the system running while idle."
+      },
+      {
+        "value": "suspend",
+        "label": "Automatic Suspend (suspend)",
+        "description": "Enter suspend automatically after the pre-suspend delay."
+      }
+    ],
+    "example": "suspend"
+  },
+  "pm.suspend-when-online": {
     "type": "bool",
-    "description": "Enable dry-run mode for MDB updates (no reboot)",
-    "label": "MDB Update Dry Run",
+    "description": "Allow a locked scooter without a main battery to suspend while connectivity remains available. A main battery in either slot prevents suspend regardless of this setting.",
+    "label": "Allow Suspend While Online",
     "user-visible": false,
-    "service": "update-service",
-    "default": false,
-    "example": true
-  },
-  "updates.mdb.orchestrate-dbc": {
-    "type": "bool",
-    "description": "Automatically power on DBC and trigger update checks when a newer DBC release is available",
-    "label": "Orchestrate DBC Updates",
-    "user-visible": false,
-    "service": "update-service",
+    "service": "pm-service",
     "default": true,
-    "example": true
+    "example": false
   },
-  "updates.dbc.method": {
-    "type": "enum",
-    "description": "Update method for DBC",
-    "label": "DBC Update Method",
-    "user-visible": true,
-    "service": "update-service",
-    "default": "delta",
-    "values": [
-      {
-        "value": "delta",
-        "label": "Delta"
-      },
-      {
-        "value": "full",
-        "label": "Full"
-      }
-    ],
-    "example": "full"
-  },
-  "updates.dbc.channel": {
-    "type": "enum",
-    "description": "Release channel override for DBC. Transient: lives in Redis only; on reboot update-service falls back to the channel inferred from the installed image.",
-    "label": "DBC Release Channel",
-    "user-visible": true,
-    "service": "update-service",
-    "default": null,
-    "transient": true,
-    "values": [
-      {
-        "value": "stable",
-        "label": "Stable"
-      },
-      {
-        "value": "testing",
-        "label": "Testing"
-      },
-      {
-        "value": "nightly",
-        "label": "Nightly"
-      }
-    ],
-    "example": "stable"
-  },
-  "updates.dbc.check-interval": {
-    "type": "duration",
-    "description": "Time between update checks for DBC (0 to disable)",
-    "label": "DBC Update Check Interval",
-    "user-visible": true,
-    "service": "update-service",
-    "default": "6h",
+  "pm.hibernation-timer": {
+    "type": "int",
+    "description": "Set the hibernation timeout in seconds. Zero disables the timer; values from 1 through 299 are clamped to 300 seconds.",
+    "label": "Hibernation Timer",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": 259200,
+    "unit": "seconds",
     "min": 0,
-    "example": "12h"
+    "example": 432000
   },
-  "updates.dbc.last-check-time": {
-    "type": "string",
-    "description": "Last time DBC checked for updates (ISO8601 timestamp)",
-    "label": "DBC Last Update Check",
-    "user-visible": false,
-    "service": "update-service",
-    "example": "2025-01-15T10:30:00Z"
-  },
-  "updates.dbc.dry-run": {
+  "pm.last-ditch-hibernate-enabled": {
     "type": "bool",
-    "description": "Enable dry-run mode for DBC updates (no reboot)",
-    "label": "DBC Update Dry Run",
+    "description": "Hibernate automatically when reserve power is critically low. Disable only for controlled batteryless bench operation; explicit and scheduled power commands remain available.",
+    "label": "Last-Ditch Hibernation",
     "user-visible": false,
-    "service": "update-service",
+    "service": "pm-service",
+    "default": true,
+    "transient": true,
+    "example": false
+  },
+  "pm.scheduled-hibernate-enabled": {
+    "type": "bool",
+    "description": "Enable scheduled hibernation using the configured cron expression and duration.",
+    "label": "Scheduled Hibernation",
+    "user-visible": false,
+    "service": "pm-service",
     "default": false,
     "example": true
+  },
+  "pm.scheduled-hibernate-cron": {
+    "type": "string",
+    "description": "Set the five-field cron expression that starts scheduled hibernation. An empty value disables the schedule. Consecutive occurrences must be at least 15 minutes apart to prevent an indistinguishable hibernate and wake loop.",
+    "label": "Scheduled Hibernation Cron Expression",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "",
+    "example": "0 22 * * *"
+  },
+  "pm.scheduled-hibernate-duration": {
+    "type": "duration",
+    "description": "Set how long scheduled hibernation lasts. The wake time is calculated from the scheduled fire time.",
+    "label": "Scheduled Hibernation Duration",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "0s",
+    "min": 0,
+    "example": "8h"
+  },
+  "pm.wake-timer-max-seconds": {
+    "type": "int",
+    "description": "Set the safety limit for wake-timer requests sent to the nRF52. Longer requests are clamped to this value.",
+    "label": "Maximum Wake-Timer Duration",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": 604800,
+    "unit": "seconds",
+    "min": 60,
+    "max": 604800,
+    "example": 604800
+  },
+  "pm.wake-timer-ack-timeout": {
+    "type": "duration",
+    "description": "Set how long pm-service waits for the nRF52 to confirm that the wake timer is armed before aborting hibernation.",
+    "label": "Wake-Timer Acknowledgment Timeout",
+    "user-visible": false,
+    "service": "pm-service",
+    "default": "10s",
+    "min": 0,
+    "example": "10s"
   },
   "cellular.apn": {
     "type": "string",
-    "description": "LTE attach + data bearer APN. Empty = use SIM operator defaults.",
+    "description": "Set the APN used for LTE attachment and the data bearer. Leave empty to use the SIM operator defaults.",
     "label": "Cellular APN",
     "user-visible": false,
     "service": "modem-service",
     "default": "",
     "example": "internet"
   },
+  "cellular.auth": {
+    "type": "string",
+    "description": "Set the data-bearer authentication method to none, PAP, or CHAP.",
+    "label": "Cellular APN Authentication",
+    "user-visible": false,
+    "service": "modem-service",
+    "default": "none",
+    "example": "pap"
+  },
   "cellular.username": {
     "type": "string",
-    "description": "APN username (PAP/CHAP authentication). Empty = none.",
-    "label": "Cellular APN username",
+    "description": "Set the username used for PAP or CHAP authentication. Leave empty when authentication is not required.",
+    "label": "Cellular APN Username",
     "user-visible": false,
     "service": "modem-service",
     "default": "",
@@ -539,43 +414,26 @@
   },
   "cellular.password": {
     "type": "string",
-    "description": "APN password (PAP/CHAP authentication). Empty = none.",
-    "label": "Cellular APN password",
+    "description": "Set the password used for PAP or CHAP authentication. Leave empty when authentication is not required.",
+    "label": "Cellular APN Password",
     "user-visible": false,
     "service": "modem-service",
     "default": "",
     "example": "cs"
   },
-  "cellular.auth": {
-    "type": "string",
-    "description": "APN authentication type for data bearer. One of: none, pap, chap.",
-    "label": "Cellular APN auth",
-    "user-visible": false,
-    "service": "modem-service",
-    "default": "none",
-    "example": "pap"
-  },
   "cellular.sim-pin": {
     "type": "string",
-    "description": "PIN for SIM unlock and lock-enable (4-8 digits, empty = leave SIM as-is)",
+    "description": "Set the four- to eight-digit PIN used to unlock the SIM and enable its lock. Leave empty to keep the current SIM lock state.",
     "label": "SIM PIN",
     "user-visible": false,
     "service": "modem-service",
     "default": "",
     "example": "1234"
   },
-  "scooter.logserver": {
-    "type": "url",
-    "description": "systemd-journal-remote URL to ship journald entries to (e.g. http://logs.example:19532). Unset or empty disables log shipping.",
-    "label": "Log Server URL",
-    "user-visible": false,
-    "service": "settings-service",
-    "example": "http://logs.example.com:19532"
-  },
   "dashboard.app": {
     "type": "enum",
-    "description": "Display application to launch on DBC boot",
-    "label": "Dashboard App",
+    "description": "Choose the application launched when the DBC boots.",
+    "label": "Dashboard Application",
     "user-visible": false,
     "service": "dbc-dispatcher",
     "default": "scootui-qt",
@@ -591,10 +449,103 @@
     ],
     "example": "scootui-tui"
   },
+  "dashboard.mode": {
+    "type": "enum",
+    "description": "Choose which dashboard screen opens by default.",
+    "label": "Default Screen",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "speedometer",
+    "values": [
+      {
+        "value": "speedometer",
+        "label": "Speedometer"
+      },
+      {
+        "value": "navigation",
+        "label": "Navigation"
+      },
+      {
+        "value": "debug",
+        "label": "Debug"
+      }
+    ],
+    "example": "navigation"
+  },
+  "dashboard.language": {
+    "type": "string",
+    "description": "Choose the language used by the dashboard interface.",
+    "label": "Dashboard Language",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "en",
+    "example": "en"
+  },
+  "dashboard.theme": {
+    "type": "enum",
+    "description": "Choose the dashboard color theme.",
+    "label": "Dashboard Theme",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "auto",
+    "values": [
+      {
+        "value": "light",
+        "label": "Light"
+      },
+      {
+        "value": "dark",
+        "label": "Dark"
+      },
+      {
+        "value": "auto",
+        "label": "Auto"
+      }
+    ],
+    "example": "auto"
+  },
+  "dashboard.backlight-mode": {
+    "type": "enum",
+    "description": "Choose a fixed screen brightness or adjust it automatically using the ambient-light sensor.",
+    "label": "Screen Brightness",
+    "user-visible": true,
+    "service": "dbc-backlight",
+    "default": "auto",
+    "values": [
+      {
+        "value": "auto",
+        "label": "Auto"
+      },
+      {
+        "value": "low",
+        "label": "Low"
+      },
+      {
+        "value": "medium",
+        "label": "Medium"
+      },
+      {
+        "value": "high",
+        "label": "High"
+      }
+    ],
+    "example": "auto"
+  },
+  "dashboard.service-mode-active": {
+    "type": "bool",
+    "description": "Report whether the settings-service service-mode overlay is active. This value is system-managed, read-only, and transient.",
+    "label": "Service Mode Active",
+    "user-visible": false,
+    "read-only": true,
+    "service": "settings-service",
+    "default": false,
+    "transient": true,
+    "example": false
+  },
   "dashboard.show-raw-speed": {
     "type": "bool",
-    "description": "Show raw uncorrected speed from ECU",
-    "label": "Show Raw Speed",
+    "description": "Display the uncorrected speed reported by the ECU.",
+    "label": "Raw ECU Speed",
     "user-visible": false,
     "service": "scootui",
     "default": false,
@@ -602,7 +553,7 @@
   },
   "dashboard.speedometer.max-speed": {
     "type": "int",
-    "description": "Full-scale value of the speedometer arc in km/h. The arc keeps its size; the tick labels and the range it covers follow this value.",
+    "description": "Set the maximum speed shown by the speedometer arc. The arc size stays fixed while its range and tick labels change.",
     "label": "Speedometer Scale",
     "user-visible": false,
     "service": "scootui",
@@ -614,7 +565,7 @@
   },
   "dashboard.speedometer.warn-speed": {
     "type": "int",
-    "description": "Speed in km/h from which the speedometer fill shifts from blue towards purple. Must be below dashboard.speedometer.overspeed.",
+    "description": "Set the speed at which the speedometer fill starts shifting from blue toward purple. This must be below the overspeed threshold.",
     "label": "Speedometer Warning Speed",
     "user-visible": false,
     "service": "scootui",
@@ -626,8 +577,8 @@
   },
   "dashboard.speedometer.overspeed": {
     "type": "int",
-    "description": "Speed in km/h above which the speedometer fill pulses purple and pink.",
-    "label": "Speedometer Overspeed",
+    "description": "Set the speed above which the speedometer fill pulses purple and pink.",
+    "label": "Speedometer Overspeed Threshold",
     "user-visible": false,
     "service": "scootui",
     "default": 60,
@@ -636,118 +587,218 @@
     "max": 200,
     "example": 75
   },
+  "dashboard.power-display-mode": {
+    "type": "enum",
+    "description": "Choose whether the dashboard displays power in kilowatts or current in amps.",
+    "label": "Power or Current Display",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "kw",
+    "values": [
+      {
+        "value": "kw",
+        "label": "Kilowatts"
+      },
+      {
+        "value": "amps",
+        "label": "Amps"
+      }
+    ],
+    "example": "amps"
+  },
+  "dashboard.battery-display-mode": {
+    "type": "enum",
+    "description": "Choose whether main-battery status is shown as a percentage, estimated range, or icons only.",
+    "label": "Main Battery Display",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "percentage",
+    "values": [
+      {
+        "value": "percentage",
+        "label": "Percentage",
+        "description": "Show the estimated remaining charge as a percentage."
+      },
+      {
+        "value": "range",
+        "label": "Estimated Range",
+        "description": "Show the estimated remaining riding range."
+      },
+      {
+        "value": "icon",
+        "label": "Icons Only",
+        "description": "Show battery icons without a numeric value."
+      }
+    ],
+    "example": "range"
+  },
+  "dashboard.blinker-style": {
+    "type": "enum",
+    "description": "Choose how the blinker indicators appear on the dashboard.",
+    "label": "Blinker Style",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "icon",
+    "values": [
+      {
+        "value": "icon",
+        "label": "Blinker Icons",
+        "description": "Show compact blinker icons."
+      },
+      {
+        "value": "overlay",
+        "label": "Full-Screen Blinker Overlay",
+        "description": "Show a large blinking overlay across the dashboard."
+      }
+    ],
+    "example": "overlay"
+  },
+  "dashboard.milestone-celebrations": {
+    "type": "bool",
+    "description": "Celebrate odometer milestones and special numbers with confetti and a banner after parking.",
+    "label": "Milestone Celebrations",
+    "user-visible": true,
+    "service": "scootui",
+    "default": false,
+    "example": true
+  },
+  "dashboard.hop-on-combo": {
+    "type": "string",
+    "description": "Store the learned hop-on and hop-off combination as pipe-delimited input tokens. An empty value means no combination is configured.",
+    "label": "Hop-On/Hop-Off Combination",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "",
+    "example": "LB|RB|HORN"
+  },
   "dashboard.show-clock": {
     "type": "enum",
-    "description": "Clock format in the status bar (always = time only, kept for compatibility)",
-    "label": "Clock",
+    "description": "Choose how the time and date appear in the status bar. Date modes show time only until the system date is plausible.",
+    "label": "Status Bar Clock",
     "user-visible": true,
     "service": "scootui",
     "default": "always",
     "values": [
       {
         "value": "always",
-        "label": "Time"
+        "label": "Time Only",
+        "description": "Show the current time."
       },
       {
         "value": "date-time",
-        "label": "Date + Time"
+        "label": "Day + Time",
+        "description": "Show the day of the month beside the current time."
       },
       {
         "value": "alternate",
-        "label": "Alternating"
+        "label": "Alternating Time / Date",
+        "description": "Alternate between the current time and the day plus month."
       },
       {
         "value": "never",
-        "label": "Never"
+        "label": "Hidden",
+        "description": "Hide both the time and date."
       }
     ],
     "example": "always"
   },
   "dashboard.show-temperature": {
     "type": "enum",
-    "description": "Ambient temperature widget visibility (warning = only when below 10 \u00b0C)",
-    "label": "Temperature",
+    "description": "Choose when the ambient temperature appears in the status bar.",
+    "label": "Outside Temperature",
     "user-visible": true,
     "service": "scootui",
     "default": "warning",
     "values": [
       {
         "value": "always",
-        "label": "Always"
+        "label": "Always",
+        "description": "Always show the ambient temperature."
       },
       {
         "value": "warning",
-        "label": "Warning Only"
+        "label": "Warn When Cold (<10 °C)",
+        "description": "Show the ambient temperature only when it is below 10 °C."
       },
       {
         "value": "never",
-        "label": "Never"
+        "label": "Never",
+        "description": "Hide the ambient temperature."
       }
     ],
     "example": "warning"
   },
   "dashboard.show-road-name": {
     "type": "enum",
-    "description": "Road name pill visibility on the cluster and map (map = map screen only, navigating = only while a route is active)",
-    "label": "Road Name",
+    "description": "Choose when the current road name appears on the speedometer and map screens.",
+    "label": "Current Road Name",
     "user-visible": true,
     "service": "scootui",
     "default": "always",
     "values": [
       {
         "value": "always",
-        "label": "Always"
+        "label": "Always",
+        "description": "Show the current road name on the speedometer and map screens."
       },
       {
         "value": "map",
-        "label": "Map Only"
+        "label": "Map Only",
+        "description": "Show the current road name only on the map screen."
       },
       {
         "value": "navigating",
-        "label": "When Navigating"
+        "label": "When Navigating",
+        "description": "Show the current road name only while a route is active."
       },
       {
         "value": "never",
-        "label": "Never"
+        "label": "Never",
+        "description": "Hide the current road name."
       }
     ],
     "example": "always"
   },
   "dashboard.show-speed-limit": {
     "type": "enum",
-    "description": "Speed limit sign visibility on the cluster and map (map = map screen only, navigating = only while a route is active, over-limit = only while exceeding the posted limit)",
-    "label": "Speed Limit",
+    "description": "Choose when the posted speed limit appears on the speedometer and map screens.",
+    "label": "Posted Speed Limit",
     "user-visible": true,
     "service": "scootui",
     "default": "always",
     "values": [
       {
         "value": "always",
-        "label": "Always"
+        "label": "Always",
+        "description": "Show the posted speed limit on the speedometer and map screens."
       },
       {
         "value": "map",
-        "label": "Map Only"
+        "label": "Map Only",
+        "description": "Show the posted speed limit only on the map screen."
       },
       {
         "value": "navigating",
-        "label": "When Navigating"
+        "label": "When Navigating",
+        "description": "Show the posted speed limit only while a route is active."
       },
       {
         "value": "over-limit",
-        "label": "Over Limit"
+        "label": "Over the Limit",
+        "description": "Show the posted speed limit only while the scooter is exceeding it."
       },
       {
         "value": "never",
-        "label": "Never"
+        "label": "Never",
+        "description": "Hide the posted speed limit."
       }
     ],
     "example": "always"
   },
   "dashboard.show-gps": {
     "type": "enum",
-    "description": "GPS indicator visibility",
-    "label": "GPS Indicator",
+    "description": "Choose when the GPS status indicator appears.",
+    "label": "GPS Status",
     "user-visible": true,
     "service": "scootui",
     "default": "error",
@@ -773,8 +824,35 @@
   },
   "dashboard.show-bluetooth": {
     "type": "enum",
-    "description": "Bluetooth indicator visibility",
-    "label": "Bluetooth Indicator",
+    "description": "Choose when the Bluetooth status indicator appears.",
+    "label": "Bluetooth Status",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "active-or-error",
+    "values": [
+      {
+        "value": "always",
+        "label": "Always"
+      },
+      {
+        "value": "active-or-error",
+        "label": "Active or Error"
+      },
+      {
+        "value": "error",
+        "label": "Error Only"
+      },
+      {
+        "value": "never",
+        "label": "Never"
+      }
+    ],
+    "example": "always"
+  },
+  "dashboard.show-internet": {
+    "type": "enum",
+    "description": "Choose when the internet connection indicator appears.",
+    "label": "Internet Connection",
     "user-visible": true,
     "service": "scootui",
     "default": "active-or-error",
@@ -800,8 +878,8 @@
   },
   "dashboard.show-cloud": {
     "type": "enum",
-    "description": "Cloud indicator visibility",
-    "label": "Cloud Indicator",
+    "description": "Choose when the cloud connection indicator appears.",
+    "label": "Cloud Connection",
     "user-visible": true,
     "service": "scootui",
     "default": "active-or-error",
@@ -825,59 +903,9 @@
     ],
     "example": "never"
   },
-  "dashboard.show-internet": {
-    "type": "enum",
-    "description": "Internet indicator visibility",
-    "label": "Internet Indicator",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "active-or-error",
-    "values": [
-      {
-        "value": "always",
-        "label": "Always"
-      },
-      {
-        "value": "active-or-error",
-        "label": "Active or Error"
-      },
-      {
-        "value": "error",
-        "label": "Error Only"
-      },
-      {
-        "value": "never",
-        "label": "Never"
-      }
-    ],
-    "example": "always"
-  },
-  "dashboard.battery-display-mode": {
-    "type": "enum",
-    "description": "Battery display mode",
-    "label": "Battery Display",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "percentage",
-    "values": [
-      {
-        "value": "percentage",
-        "label": "Percentage"
-      },
-      {
-        "value": "range",
-        "label": "Range"
-      },
-      {
-        "value": "icon",
-        "label": "Icons Only"
-      }
-    ],
-    "example": "range"
-  },
   "dashboard.show-cb-battery": {
     "type": "enum",
-    "description": "CBB charge icon visibility in the status bar (warning = only when SoC <= 50%)",
+    "description": "Choose when the CBB charge indicator appears in the status bar. When Low shows it at or below 50% charge.",
     "label": "CBB Battery",
     "user-visible": true,
     "service": "scootui",
@@ -900,8 +928,8 @@
   },
   "dashboard.show-aux-battery": {
     "type": "enum",
-    "description": "12V battery charge icon visibility in the status bar (warning = only when SoC <= 50%)",
-    "label": "12V Battery",
+    "description": "Choose when the AUX battery charge indicator appears in the status bar. When Low shows it at or below 50% charge.",
+    "label": "12 V (AUX) Battery",
     "user-visible": true,
     "service": "scootui",
     "default": "warning",
@@ -921,10 +949,28 @@
     ],
     "example": "warning"
   },
+  "dashboard.maps-available": {
+    "type": "bool",
+    "description": "Report whether offline map tiles are installed. This value is system-managed and read-only.",
+    "label": "Maps Available",
+    "user-visible": false,
+    "service": "scootui",
+    "default": false,
+    "read-only": true
+  },
+  "dashboard.navigation-available": {
+    "type": "bool",
+    "description": "Report whether offline maps and the routing engine are available. This value is system-managed and read-only.",
+    "label": "Navigation Available",
+    "user-visible": false,
+    "service": "scootui",
+    "default": false,
+    "read-only": true
+  },
   "dashboard.map.type": {
     "type": "enum",
-    "description": "Map tile source",
-    "label": "Map Type",
+    "description": "Choose between online and offline maps.",
+    "label": "Map Source",
     "user-visible": true,
     "service": "scootui",
     "default": "offline",
@@ -940,37 +986,10 @@
     ],
     "example": "online"
   },
-  "dashboard.map.view-mode": {
-    "type": "enum",
-    "description": "Map camera view: 3D (tilted perspective) or 2D (flat top-down)",
-    "label": "Map View",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "3d",
-    "values": [
-      {
-        "value": "3d",
-        "label": "3D"
-      },
-      {
-        "value": "2d",
-        "label": "2D"
-      }
-    ],
-    "example": "2d"
-  },
-  "dashboard.map.north-oriented": {
-    "type": "bool",
-    "description": "In 2D view, keep the map oriented to north instead of following the vehicle heading",
-    "label": "North Oriented",
-    "user-visible": true,
-    "service": "scootui",
-    "default": false
-  },
   "dashboard.map.render-mode": {
     "type": "enum",
-    "description": "Map rendering mode",
-    "label": "Map Render Mode",
+    "description": "Choose whether maps are rendered from vector or raster tiles.",
+    "label": "Map Rendering Mode",
     "user-visible": false,
     "service": "scootui",
     "default": "vector",
@@ -986,90 +1005,46 @@
     ],
     "example": "raster"
   },
+  "dashboard.map.view-mode": {
+    "type": "enum",
+    "description": "Choose between a tilted 3D view and a flat 2D view.",
+    "label": "Map View",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "3d",
+    "values": [
+      {
+        "value": "3d",
+        "label": "3D Perspective",
+        "description": "Show a tilted map that follows the scooter heading."
+      },
+      {
+        "value": "2d",
+        "label": "2D Top-Down",
+        "description": "Show a flat map from directly above."
+      }
+    ],
+    "example": "2d"
+  },
+  "dashboard.map.north-oriented": {
+    "type": "bool",
+    "description": "In 2D view, keep north at the top instead of rotating the map with the scooter heading.",
+    "label": "Keep North at Top",
+    "user-visible": true,
+    "service": "scootui",
+    "default": false
+  },
   "dashboard.map.traffic-overlay": {
     "type": "bool",
-    "description": "Show live traffic overlay on the map (requires online tiles)",
+    "description": "Show live traffic over the map. This requires online tiles.",
     "label": "Traffic Overlay",
     "user-visible": true,
     "service": "scootui",
     "default": false
   },
-  "dashboard.theme": {
-    "type": "enum",
-    "description": "UI theme",
-    "label": "Theme",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "auto",
-    "values": [
-      {
-        "value": "light",
-        "label": "Light"
-      },
-      {
-        "value": "dark",
-        "label": "Dark"
-      },
-      {
-        "value": "auto",
-        "label": "Auto"
-      }
-    ],
-    "example": "auto"
-  },
-  "dashboard.backlight-mode": {
-    "type": "enum",
-    "description": "Display backlight level (auto = ambient light sensor)",
-    "label": "Backlight",
-    "user-visible": true,
-    "service": "dbc-backlight",
-    "default": "auto",
-    "values": [
-      {
-        "value": "auto",
-        "label": "Auto"
-      },
-      {
-        "value": "low",
-        "label": "Low"
-      },
-      {
-        "value": "medium",
-        "label": "Medium"
-      },
-      {
-        "value": "high",
-        "label": "High"
-      }
-    ],
-    "example": "auto"
-  },
-  "dashboard.mode": {
-    "type": "enum",
-    "description": "Default screen mode",
-    "label": "Default Screen",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "speedometer",
-    "values": [
-      {
-        "value": "speedometer",
-        "label": "Speedometer"
-      },
-      {
-        "value": "navigation",
-        "label": "Navigation"
-      },
-      {
-        "value": "debug",
-        "label": "Debug"
-      }
-    ],
-    "example": "navigation"
-  },
   "dashboard.valhalla-url": {
     "type": "url",
-    "description": "Valhalla routing service endpoint",
+    "description": "Set the Valhalla routing-service endpoint.",
     "label": "Valhalla URL",
     "user-visible": false,
     "service": "scootui",
@@ -1078,164 +1053,165 @@
   },
   "dashboard.route-preference": {
     "type": "enum",
-    "description": "How navigation picks a route. Fastest uses travel time, shortest uses raw distance and ignores all other preferences including cobblestone avoidance.",
-    "label": "Route",
+    "description": "Choose whether navigation prioritizes travel time or distance. Shortest routes ignore other preferences, including cobblestone avoidance.",
+    "label": "Route Preference",
     "user-visible": true,
     "service": "scootui",
     "default": "fastest",
     "values": [
       {
         "value": "fastest",
-        "label": "Fastest"
+        "label": "Fastest",
+        "description": "Prefer the route with the shortest estimated travel time."
       },
       {
         "value": "shortest",
-        "label": "Shortest"
+        "label": "Shortest",
+        "description": "Prefer the shortest distance and ignore other routing preferences."
       }
     ],
     "example": "fastest"
   },
   "dashboard.avoid-cobblestone": {
     "type": "enum",
-    "description": "How hard navigation works to keep off cobblestone and sett. The level is a detour budget: low spends up to as much extra travel time as riding the rough stretch would take, medium four times that, high eight times. Needs routing tiles that classify cobbles; older tiles ignore it. Not applied when the route preference is shortest.",
-    "label": "Avoid Cobblestone",
+    "description": "Choose how strongly navigation avoids cobblestones and stone setts. Higher levels permit longer detours. This requires compatible routing tiles and does not apply to Shortest routes.",
+    "label": "Avoid Cobblestones",
     "user-visible": true,
     "service": "scootui",
     "default": "medium",
     "values": [
       {
         "value": "off",
-        "label": "Off"
+        "label": "Off",
+        "description": "Do not apply a cobblestone avoidance penalty."
       },
       {
         "value": "low",
-        "label": "Low"
+        "label": "Low",
+        "description": "Allow a modest detour to avoid cobblestones and stone setts."
       },
       {
         "value": "medium",
-        "label": "Medium"
+        "label": "Medium",
+        "description": "Allow a longer detour to avoid cobblestones and stone setts."
       },
       {
         "value": "high",
-        "label": "High"
+        "label": "High",
+        "description": "Allow the longest detour to avoid cobblestones and stone setts."
       }
     ],
     "example": "medium"
   },
-  "dashboard.power-display-mode": {
-    "type": "enum",
-    "description": "Power display unit",
-    "label": "Power Display",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "kw",
-    "values": [
-      {
-        "value": "kw",
-        "label": "Kilowatts"
-      },
-      {
-        "value": "amps",
-        "label": "Amps"
-      }
-    ],
-    "example": "amps"
-  },
-  "dashboard.milestone-celebrations": {
-    "type": "bool",
-    "description": "Celebrate odometer milestones (every 500 km) and special-number easter eggs with on-screen confetti and a banner when parking. Disable to turn all milestone celebrations off.",
-    "label": "Milestone Celebrations",
-    "user-visible": true,
-    "service": "scootui",
-    "default": false,
-    "example": true
-  },
-  "dashboard.language": {
-    "type": "string",
-    "description": "Dashboard UI language",
-    "label": "Language",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "en",
-    "example": "en"
-  },
-  "dashboard.blinker-style": {
-    "type": "enum",
-    "description": "Blinker indicator style",
-    "label": "Blinker Style",
-    "user-visible": true,
-    "service": "scootui",
-    "default": "icon",
-    "values": [
-      {
-        "value": "icon",
-        "label": "Icon"
-      },
-      {
-        "value": "overlay",
-        "label": "Overlay"
-      }
-    ],
-    "example": "overlay"
-  },
-  "dashboard.hop-on-combo": {
-    "type": "string",
-    "description": "User-defined hop-on / hop-off unlock combo as pipe-delimited tokens (e.g. 'LB|RB|HORN'). Empty = no combo defined. Managed by the dashboard learning UI.",
-    "label": "Hop-on Combo",
-    "user-visible": false,
-    "service": "scootui",
-    "default": "",
-    "example": "LB|RB|HORN"
-  },
-  "dashboard.maps-available": {
-    "type": "bool",
-    "description": "Whether offline map tiles are available (system-managed)",
-    "label": "Maps Available",
-    "user-visible": false,
-    "service": "scootui",
-    "default": false,
-    "read-only": true
-  },
-  "dashboard.navigation-available": {
-    "type": "bool",
-    "description": "Whether full navigation is available (maps + routing engine, system-managed)",
-    "label": "Navigation Available",
-    "user-visible": false,
-    "service": "scootui",
-    "default": false,
-    "read-only": true
-  },
-  "dashboard.service-mode-active": {
-    "type": "bool",
-    "description": "Runtime status: service mode is active. Published by settings-service; not user-settable.",
-    "label": "Service Mode Active",
-    "user-visible": false,
-    "read-only": true,
-    "service": "settings-service",
-    "default": false,
-    "transient": true,
-    "example": false
-  },
   "dashboard.maps.check-for-updates": {
     "type": "bool",
-    "description": "Automatically check for map tile updates (weekly when online)",
-    "label": "Map Update Check",
+    "description": "Check for map updates automatically once a week while online.",
+    "label": "Check for Map Updates",
     "user-visible": true,
     "service": "scootui",
     "default": false
   },
   "dashboard.maps.auto-download": {
     "type": "bool",
-    "description": "Automatically download map updates when available (uses mobile data)",
-    "label": "Auto-download Maps",
+    "description": "Download available map updates automatically. This may use mobile data.",
+    "label": "Download Map Updates",
     "user-visible": true,
     "service": "scootui",
     "default": false
   },
+  "dashboard.saved-locations.0.label": {
+    "type": "string",
+    "description": "Store the display name of an indexed saved location.",
+    "label": "Saved Location Name",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "Home"
+  },
+  "dashboard.saved-locations.0.latitude": {
+    "type": "float",
+    "description": "Store the latitude of an indexed saved location in decimal degrees.",
+    "label": "Saved Location Latitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -90,
+    "max": 90,
+    "example": 52.52
+  },
+  "dashboard.saved-locations.0.longitude": {
+    "type": "float",
+    "description": "Store the longitude of an indexed saved location in decimal degrees.",
+    "label": "Saved Location Longitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -180,
+    "max": 180,
+    "example": 13.405
+  },
+  "dashboard.saved-locations.0.created-at": {
+    "type": "string",
+    "description": "Store the ISO 8601 creation timestamp of an indexed saved location.",
+    "label": "Saved Location Creation Time",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "dashboard.saved-locations.0.last-used-at": {
+    "type": "string",
+    "description": "Store the ISO 8601 timestamp when an indexed saved location was last used.",
+    "label": "Saved Location Last-Used Time",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "2025-01-15T12:00:00Z"
+  },
+  "dashboard.recent-destinations.0.label": {
+    "type": "string",
+    "description": "Store the display name of an indexed recent destination.",
+    "label": "Recent Destination Name",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "Home"
+  },
+  "dashboard.recent-destinations.0.latitude": {
+    "type": "float",
+    "description": "Store the latitude of an indexed recent destination in decimal degrees.",
+    "label": "Recent Destination Latitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -90,
+    "max": 90,
+    "example": 52.52
+  },
+  "dashboard.recent-destinations.0.longitude": {
+    "type": "float",
+    "description": "Store the longitude of an indexed recent destination in decimal degrees.",
+    "label": "Recent Destination Longitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -180,
+    "max": 180,
+    "example": 13.405
+  },
+  "dashboard.recent-destinations.0.used-at": {
+    "type": "string",
+    "description": "Store the ISO 8601 timestamp when an indexed recent destination was used.",
+    "label": "Recent Destination Last-Used Time",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "2025-01-15T12:00:00Z"
+  },
   "engine-ecu.boost": {
     "type": "bool",
-    "description": "Enable motor boost mode",
-    "label": "Boost Mode",
+    "description": "Enable motor boost mode.",
+    "label": "Motor Boost",
     "user-visible": false,
     "service": "ecu-service",
     "default": false,
@@ -1243,8 +1219,8 @@
   },
   "engine-ecu.kers": {
     "type": "enum",
-    "description": "Kinetic energy recovery system (KERS)",
-    "label": "KERS",
+    "description": "Enable or disable the kinetic energy recovery system.",
+    "label": "Regenerative Braking (KERS)",
     "user-visible": false,
     "service": "ecu-service",
     "default": "enabled",
@@ -1262,8 +1238,8 @@
   },
   "engine-ecu.kers-power": {
     "type": "int",
-    "description": "KERS regeneration current",
-    "label": "KERS Power",
+    "description": "Set the KERS regeneration current.",
+    "label": "KERS Regeneration Current",
     "user-visible": false,
     "service": "ecu-service",
     "unit": "mA",
@@ -1273,8 +1249,8 @@
   },
   "engine-ecu.kers-power-dual": {
     "type": "int",
-    "description": "KERS regeneration current when both batteries are active",
-    "label": "KERS Power (Dual Battery)",
+    "description": "Set the KERS regeneration current used while both batteries are active.",
+    "label": "Dual-Battery KERS Regeneration Current",
     "user-visible": false,
     "service": "ecu-service",
     "unit": "mA",
@@ -1282,136 +1258,204 @@
     "max": 65535,
     "example": 15000
   },
-  "dashboard.saved-locations.0.created-at": {
-    "type": "string",
-    "description": "Creation timestamp",
-    "label": "Saved Location Created At",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "example": "2025-01-15T10:30:00Z"
+  "updates.mdb.channel": {
+    "type": "enum",
+    "description": "Choose the release channel used for MDB updates. This override is transient; after reboot, the channel is inferred from the installed image.",
+    "label": "MDB Update Channel",
+    "user-visible": true,
+    "service": "update-service",
+    "default": null,
+    "transient": true,
+    "values": [
+      {
+        "value": "stable",
+        "label": "Stable"
+      },
+      {
+        "value": "testing",
+        "label": "Testing"
+      },
+      {
+        "value": "nightly",
+        "label": "Nightly"
+      }
+    ],
+    "example": "stable"
   },
-  "dashboard.saved-locations.0.label": {
-    "type": "string",
-    "description": "Location label",
-    "label": "Saved Location Label",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "example": "Home"
-  },
-  "dashboard.saved-locations.0.last-used-at": {
-    "type": "string",
-    "description": "Last used timestamp",
-    "label": "Saved Location Last Used",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "example": "2025-01-15T12:00:00Z"
-  },
-  "dashboard.saved-locations.0.latitude": {
-    "type": "float",
-    "description": "Latitude",
-    "label": "Saved Location Latitude",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "min": -90,
-    "max": 90,
-    "example": 52.52
-  },
-  "dashboard.saved-locations.0.longitude": {
-    "type": "float",
-    "description": "Longitude",
-    "label": "Saved Location Longitude",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "min": -180,
-    "max": 180,
-    "example": 13.405
-  },
-  "dashboard.recent-destinations.0.label": {
-    "type": "string",
-    "description": "Recent destination label",
-    "label": "Recent Destination Label",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "example": "Home"
-  },
-  "dashboard.recent-destinations.0.latitude": {
-    "type": "float",
-    "description": "Latitude",
-    "label": "Recent Destination Latitude",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "min": -90,
-    "max": 90,
-    "example": 52.52
-  },
-  "dashboard.recent-destinations.0.longitude": {
-    "type": "float",
-    "description": "Longitude",
-    "label": "Recent Destination Longitude",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "min": -180,
-    "max": 180,
-    "example": 13.405
-  },
-  "dashboard.recent-destinations.0.used-at": {
-    "type": "string",
-    "description": "Last used timestamp",
-    "label": "Recent Destination Used At",
-    "user-visible": false,
-    "service": "scootui",
-    "pattern": "indexed",
-    "example": "2025-01-15T12:00:00Z"
+  "updates.mdb.method": {
+    "type": "enum",
+    "description": "Choose whether MDB updates use delta packages or full system images.",
+    "label": "MDB Update Package",
+    "user-visible": true,
+    "service": "update-service",
+    "default": "delta",
+    "values": [
+      {
+        "value": "delta",
+        "label": "Delta Package",
+        "description": "Apply a smaller package containing changes from the installed MDB version."
+      },
+      {
+        "value": "full",
+        "label": "Full System Image",
+        "description": "Install a complete MDB system image."
+      }
+    ],
+    "example": "full"
   },
   "updates.mdb.releases-url": {
     "type": "url",
-    "description": "Release index base URL for MDB",
+    "description": "Set the base URL of the MDB release index.",
     "label": "MDB Releases URL",
     "user-visible": false,
     "service": "update-service",
     "default": "https://downloads.librescoot.org/releases",
     "example": "https://downloads.librescoot.org/releases"
   },
+  "updates.mdb.check-interval": {
+    "type": "duration",
+    "description": "Set how often the MDB checks for updates. Set to zero to disable automatic checks.",
+    "label": "MDB Update Check Frequency",
+    "user-visible": true,
+    "service": "update-service",
+    "default": "6h",
+    "min": 0,
+    "example": "12h"
+  },
+  "updates.mdb.last-check-time": {
+    "type": "string",
+    "description": "Report the ISO 8601 timestamp of the last MDB update check.",
+    "label": "Last MDB Update Check",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.mdb.dry-run": {
+    "type": "bool",
+    "description": "Allow update discovery, download, and preparation, but skip installation and reboot on the MDB.",
+    "label": "MDB Update Dry Run",
+    "user-visible": false,
+    "service": "update-service",
+    "default": false,
+    "example": true
+  },
+  "updates.mdb.orchestrate-dbc": {
+    "type": "bool",
+    "description": "Power on the DBC and request an update check automatically when a newer DBC release is available.",
+    "label": "Automatic DBC Update Checks",
+    "user-visible": false,
+    "service": "update-service",
+    "default": true,
+    "example": true
+  },
+  "updates.dbc.channel": {
+    "type": "enum",
+    "description": "Choose the release channel used for DBC updates. This override is transient; after reboot, the channel is inferred from the installed image.",
+    "label": "DBC Update Channel",
+    "user-visible": true,
+    "service": "update-service",
+    "default": null,
+    "transient": true,
+    "values": [
+      {
+        "value": "stable",
+        "label": "Stable"
+      },
+      {
+        "value": "testing",
+        "label": "Testing"
+      },
+      {
+        "value": "nightly",
+        "label": "Nightly"
+      }
+    ],
+    "example": "stable"
+  },
+  "updates.dbc.method": {
+    "type": "enum",
+    "description": "Choose whether DBC updates use delta packages or full system images.",
+    "label": "DBC Update Package",
+    "user-visible": true,
+    "service": "update-service",
+    "default": "delta",
+    "values": [
+      {
+        "value": "delta",
+        "label": "Delta Package",
+        "description": "Apply a smaller package containing changes from the installed DBC version."
+      },
+      {
+        "value": "full",
+        "label": "Full System Image",
+        "description": "Install a complete DBC system image."
+      }
+    ],
+    "example": "full"
+  },
   "updates.dbc.releases-url": {
     "type": "url",
-    "description": "Release index base URL for DBC",
+    "description": "Set the base URL of the DBC release index.",
     "label": "DBC Releases URL",
     "user-visible": false,
     "service": "update-service",
     "default": "https://downloads.librescoot.org/releases",
     "example": "https://downloads.librescoot.org/releases"
   },
+  "updates.dbc.check-interval": {
+    "type": "duration",
+    "description": "Set how often the DBC checks for updates. Set to zero to disable automatic checks.",
+    "label": "DBC Update Check Frequency",
+    "user-visible": true,
+    "service": "update-service",
+    "default": "6h",
+    "min": 0,
+    "example": "12h"
+  },
+  "updates.dbc.last-check-time": {
+    "type": "string",
+    "description": "Report the ISO 8601 timestamp of the last DBC update check.",
+    "label": "Last DBC Update Check",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.dbc.dry-run": {
+    "type": "bool",
+    "description": "Allow update discovery, download, and preparation, but skip installation and reboot on the DBC.",
+    "label": "DBC Update Dry Run",
+    "user-visible": false,
+    "service": "update-service",
+    "default": false,
+    "example": true
+  },
   "trip.counter-reset": {
     "type": "enum",
-    "description": "When to reset the trip counter",
-    "label": "Trip Counter Reset",
+    "description": "Choose when the trip counter resets.",
+    "label": "Reset Trip Counter",
     "user-visible": true,
     "service": "trip-service",
     "default": "ride",
     "values": [
       {
         "value": "ride",
-        "label": "After Each Ride"
+        "label": "After Each Ride",
+        "description": "Reset the trip counter after every completed ride."
       },
       {
         "value": "day",
-        "label": "Daily"
+        "label": "Daily",
+        "description": "Reset the trip counter once per day."
       },
       {
         "value": "battery",
-        "label": "On Battery Change"
+        "label": "When Main Battery Is Swapped",
+        "description": "Reset the trip counter when the main battery is swapped."
       },
       {
         "value": "manual",
-        "label": "Manually"
+        "label": "Only Manually",
+        "description": "Keep the trip counter until it is reset manually."
       }
     ],
     "example": "ride"
@@ -1419,7 +1463,7 @@
   "trip.expunge": {
     "type": "string",
     "format": "trip-expunge",
-    "description": "When to expunge completed trip history",
+    "description": "Choose how long completed trip history is kept.",
     "label": "Trip History Retention",
     "user-visible": true,
     "service": "trip-service",

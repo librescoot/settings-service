@@ -34,7 +34,7 @@ const testJSON = `{
     "values": [
       {"value": "light", "label": "Light"},
       {"value": "dark", "label": "Dark"},
-      {"value": "auto", "label": "Auto"}
+      {"value": "auto", "label": "Auto", "description": "Follow ambient conditions."}
     ],
     "default": "dark"
   },
@@ -113,6 +113,9 @@ func TestParse(t *testing.T) {
 	}
 	if dt.Values[2].Value != "auto" || dt.Values[2].Label != "Auto" {
 		t.Errorf("dashboard.theme values[2] = %+v", dt.Values[2])
+	}
+	if dt.Values[2].Description != "Follow ambient conditions." {
+		t.Errorf("dashboard.theme values[2].Description = %q", dt.Values[2].Description)
 	}
 	if dt.Default != "dark" {
 		t.Errorf("dashboard.theme default = %v, want %q", dt.Default, "dark")

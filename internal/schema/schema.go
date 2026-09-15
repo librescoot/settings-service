@@ -7,8 +7,9 @@ import (
 )
 
 type EnumValue struct {
-	Value string `json:"value"`
-	Label string `json:"label"`
+	Value       string `json:"value"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
 }
 
 type Setting struct {
