@@ -45,10 +45,11 @@ func New(redisAddr, schemaPath string) (*SettingsService, error) {
 	if schemaPath != "" {
 		s, err = schema.LoadFile(schemaPath)
 		if err != nil {
-			log.Printf("Warning: failed to load schema: %v (continuing without schema)", err)
-		} else {
-			log.Printf("Loaded schema with %d settings", len(s.Settings))
+			redisClient.Close()
+			cancel()
+			return nil, fmt.Errorf("failed to load configured schema: %w", err)
 		}
+		log.Printf("Loaded schema with %d settings", len(s.Settings))
 	}
 
 	return &SettingsService{
@@ -83,6 +84,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 
 	userSet := make(map[string]struct{})
 	var droppedTransient []string
+	invalid := make(map[string]string)
 	cfg, err := config.LoadFromFile()
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -90,10 +92,32 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 		log.Printf("No %s found, using schema defaults only", config.TomlFilePath)
 	} else {
-		droppedTransient = applyTomlOverlay(cfg.ToRedisFields(), s.schema, fields, userSet)
+		droppedTransient, invalid = applyTomlOverlay(cfg.ToRedisFields(), s.schema, fields, userSet)
+	}
+	for key, invalidValue := range invalid {
+		fallback := s.lastPersisted[key]
+		if fallback == "" {
+			if key == "trip.expunge" {
+				fallback = "never"
+			} else if defaultValue, ok := s.schema.DefaultValue(key); ok {
+				fallback = defaultValue
+			}
+		}
+		if fallback == "" {
+			continue
+		}
+		log.Printf("Ignoring invalid %s value %q from TOML and restoring %q", key, invalidValue, fallback)
+		fields[key] = fallback
+		userSet[key] = struct{}{}
 	}
 	s.userSetKeys = userSet
-	rewriteToml = len(droppedTransient) > 0
+	rewriteToml = len(droppedTransient) > 0 || len(invalid) > 0
+	if rewriteToml {
+		// Force the repaired TOML to be written even if it matches a prior snapshot.
+		s.lastPersisted = nil
+	} else {
+		s.lastPersisted = persistedFields(fields, userSet)
+	}
 
 	if err := s.redisClient.ReplaceSettings(fields); err != nil {
 		return fmt.Errorf("failed to write settings to Redis: %w", err)
@@ -173,6 +197,11 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	overlayBaseForPersist(settings, s.overlayActive, s.overlayBase)
 
 	persisted := filterUserSet(settings, s.userSetKeys)
+	for key, value := range persisted {
+		if err := s.schema.ValidateValue(key, value); err != nil {
+			return fmt.Errorf("refusing to persist invalid %s value: %w", key, err)
+		}
+	}
 	if equalStringMaps(persisted, s.lastPersisted) {
 		return nil
 	}
@@ -183,8 +212,8 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	}
 
 	for field := range settings {
-		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") && !strings.HasPrefix(field, "alarm.") && !strings.HasPrefix(field, "engine-ecu.") && !strings.HasPrefix(field, "keycard.") && !strings.HasPrefix(field, "pm.") {
-			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', 'dashboard.', 'alarm.', 'engine-ecu.', 'keycard.', or 'pm.'", field)
+		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") && !strings.HasPrefix(field, "alarm.") && !strings.HasPrefix(field, "engine-ecu.") && !strings.HasPrefix(field, "keycard.") && !strings.HasPrefix(field, "pm.") && !strings.HasPrefix(field, "trip.") {
+			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', 'dashboard.', 'alarm.', 'engine-ecu.', 'keycard.', 'pm.', or 'trip.'", field)
 		}
 	}
 
@@ -219,7 +248,8 @@ func cloneStringMap(in map[string]string) map[string]string {
 	return out
 }
 
-func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string]any, userSet map[string]struct{}) (droppedTransient []string) {
+func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string]any, userSet map[string]struct{}) (droppedTransient []string, invalid map[string]string) {
+	invalid = make(map[string]string)
 	for k, v := range toml {
 		// Transient settings are runtime-only and must not survive a restart.
 		if sch.IsTransient(k) {
@@ -227,10 +257,26 @@ func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string
 			droppedTransient = append(droppedTransient, k)
 			continue
 		}
+		value := fmt.Sprintf("%v", v)
+		if err := sch.ValidateValue(k, value); err != nil {
+			log.Printf("Ignoring invalid %s value from toml: %v", k, err)
+			invalid[k] = value
+			continue
+		}
 		fields[k] = v
 		userSet[k] = struct{}{}
 	}
-	return droppedTransient
+	return droppedTransient, invalid
+}
+
+func persistedFields(fields map[string]any, userSet map[string]struct{}) map[string]string {
+	persisted := make(map[string]string, len(userSet))
+	for key := range userSet {
+		if value, ok := fields[key]; ok {
+			persisted[key] = fmt.Sprintf("%v", value)
+		}
+	}
+	return persisted
 }
 
 func transientKeys(sch *schema.Schema) []string {
@@ -301,9 +347,16 @@ func (s *SettingsService) WatchSettings() {
 
 	for {
 		select {
-		case msg := <-ch:
+		case msg, ok := <-ch:
+			if !ok {
+				return
+			}
 			if msg.Channel == redis.SettingsChannel {
 				log.Printf("Received update notification for field: %s", msg.Payload)
+
+				if s.schema.HasValidation(msg.Payload) && !s.reconcileValidatedSetting(msg.Payload) {
+					continue
+				}
 
 				transient := s.schema.IsTransient(msg.Payload)
 				overlaid := s.isOverlaid(msg.Payload)
@@ -342,6 +395,39 @@ func (s *SettingsService) WatchSettings() {
 			return
 		}
 	}
+}
+
+// reconcileValidatedSetting rejects an invalid live value before it reaches
+// TOML. The repair is published once; the matching valid notification persists it.
+func (s *SettingsService) reconcileValidatedSetting(key string) bool {
+	value, exists, err := s.redisClient.GetSettingField(key)
+	if err != nil {
+		log.Printf("Error reading %s update: %v", key, err)
+		return false
+	}
+	if !exists || s.schema.ValidateValue(key, value) == nil {
+		return true
+	}
+
+	s.mu.Lock()
+	fallback := s.lastPersisted[key]
+	s.mu.Unlock()
+	if fallback == "" {
+		if key == "trip.expunge" {
+			fallback = "never"
+		} else if defaultValue, ok := s.schema.DefaultValue(key); ok {
+			fallback = defaultValue
+		}
+	}
+	if fallback == "" {
+		log.Printf("Rejecting invalid live %s value %q without a safe fallback", key, value)
+		return false
+	}
+	log.Printf("Rejecting invalid live %s value %q and restoring %q", key, value, fallback)
+	if err := s.redisClient.SetSettingField(key, fallback); err != nil {
+		log.Printf("Error restoring %s: %v", key, err)
+	}
+	return false
 }
 
 func (s *SettingsService) updateAPNFromRedis() {

@@ -72,7 +72,8 @@ func main() {
 	}
 
 	if err := svc.LoadSettingsFromTOML(); err != nil {
-		log.Printf("Warning: Failed to load initial settings from TOML: %v", err)
+		svc.Close()
+		log.Fatalf("Failed to load initial settings from TOML: %v", err)
 	}
 
 	svc.ReapplyOverlayOnBoot()

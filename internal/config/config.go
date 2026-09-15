@@ -21,6 +21,7 @@ type Config struct {
 	EngineECU map[string]interface{} `toml:"engine-ecu"`
 	Keycard   map[string]interface{} `toml:"keycard"`
 	PM        map[string]interface{} `toml:"pm"`
+	Trip      map[string]interface{} `toml:"trip"`
 }
 
 func LoadFromFile() (*Config, error) {
@@ -76,6 +77,7 @@ func ParseRedisSettings(settings map[string]string) *Config {
 		EngineECU: make(map[string]interface{}),
 		Keycard:   make(map[string]interface{}),
 		PM:        make(map[string]interface{}),
+		Trip:      make(map[string]interface{}),
 	}
 
 	for field, value := range settings {
@@ -101,6 +103,8 @@ func ParseRedisSettings(settings map[string]string) *Config {
 			section = config.Keycard
 		case "pm":
 			section = config.PM
+		case "trip":
+			section = config.Trip
 		default:
 			continue
 		}
@@ -133,6 +137,7 @@ func (c *Config) ToRedisFields() map[string]interface{} {
 		"engine-ecu": c.EngineECU,
 		"keycard":    c.Keycard,
 		"pm":         c.PM,
+		"trip":       c.Trip,
 	}
 	for prefix, section := range sections {
 		flattenSection(prefix, section, fields)

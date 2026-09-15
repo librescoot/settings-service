@@ -28,9 +28,9 @@ redis-cli HSET settings alarm.enabled false
 redis-cli PUBLISH settings alarm.enabled
 ```
 
-On boot the service writes the effective schema defaults and TOML overlay to the hash and publishes each written field. It sends systemd readiness only after that seed completes. The deployed unit therefore starts it before vehicle-service so consumers can observe the initial settings hash.
+On boot the service writes the effective schema defaults and TOML overlay to the hash and publishes each written field. A configured schema or initial hydration failure terminates the service before it sends systemd readiness. The deployed unit therefore starts it before vehicle-service so consumers can observe the initial settings hash.
 
-Only these TOML top-level sections are represented: `scooter`, `cellular`, `updates`, `dashboard`, `alarm`, `engine-ecu`, `keycard`, and `pm`. Values are converted to Redis strings. Consult [`settings.schema.json`](settings.schema.json) for supported keys, defaults, types, ranges, and transient markers; this service loads that metadata but does not itself reject a value based on the schema.
+Only these TOML top-level sections are represented: `scooter`, `cellular`, `updates`, `dashboard`, `alarm`, `engine-ecu`, `keycard`, `pm`, and `trip`. Values are converted to Redis strings. Consult [`settings.schema.json`](settings.schema.json) for supported keys, defaults, types, ranges, and transient markers; this service loads that metadata but generally does not itself reject a value based on the schema. `trip.expunge` is the explicit exception: its `trip-expunge` format is validated during TOML hydration and live Redis updates. Invalid values are repaired to the last persisted valid policy, or `never` when none exists.
 
 ### Service-mode overlay
 

@@ -106,8 +106,10 @@ func (c *Client) SetKey(key, value string) error {
 }
 
 func (c *Client) Close() {
-	if err := c.pubsub.Close(); err != nil {
-		log.Printf("Error closing Redis pubsub: %v", err)
+	if c.pubsub != nil {
+		if err := c.pubsub.Close(); err != nil {
+			log.Printf("Error closing Redis pubsub: %v", err)
+		}
 	}
 	if err := c.client.Close(); err != nil {
 		log.Printf("Error closing Redis client: %v", err)

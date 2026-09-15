@@ -25,6 +25,7 @@ type Setting struct {
 	Example     any         `json:"example,omitempty"`
 	ReadOnly    bool        `json:"read-only,omitempty"`
 	Pattern     string      `json:"pattern,omitempty"`
+	Format      string      `json:"format,omitempty"`
 	Transient   bool        `json:"transient,omitempty"`
 }
 
@@ -60,6 +61,48 @@ func (s *Schema) IsTransient(key string) bool {
 	}
 	setting, ok := s.Settings[key]
 	return ok && setting.Transient
+}
+
+// ValidateValue applies the setting's explicit format and enum constraints.
+func (s *Schema) ValidateValue(key, value string) error {
+	if s == nil {
+		return nil
+	}
+	setting, ok := s.Settings[key]
+	if !ok {
+		return nil
+	}
+	if err := ValidateFormat(setting.Format, value); err != nil {
+		return err
+	}
+	if len(setting.Values) == 0 {
+		return nil
+	}
+	for _, candidate := range setting.Values {
+		if value == candidate.Value {
+			return nil
+		}
+	}
+	return fmt.Errorf("value %q is not allowed for %s", value, key)
+}
+
+func (s *Schema) HasValidation(key string) bool {
+	if s == nil {
+		return false
+	}
+	setting, ok := s.Settings[key]
+	return ok && (setting.Format != "" || len(setting.Values) != 0)
+}
+
+func (s *Schema) DefaultValue(key string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+	setting, ok := s.Settings[key]
+	if !ok || setting.Default == nil {
+		return "", false
+	}
+	return fmt.Sprintf("%v", setting.Default), true
 }
 
 // Defaults includes transient defaults because transient controls persistence,

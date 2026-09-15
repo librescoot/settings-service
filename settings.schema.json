@@ -291,7 +291,7 @@
   },
   "scooter.usb0-policy": {
     "type": "enum",
-    "description": "MDB to DBC USB link behavior. auto brings usb0 down when the scooter is in standby (default). always-on keeps usb0 up regardless of dashboard state for installer/diag reachability — transient, so the override lasts only until the next reboot.",
+    "description": "MDB to DBC USB link behavior. auto brings usb0 down when the scooter is in standby (default). always-on keeps usb0 up regardless of dashboard state for installer/diag reachability \u2014 transient, so the override lasts only until the next reboot.",
     "label": "USB Link Policy",
     "user-visible": false,
     "service": "vehicle-service",
@@ -665,7 +665,7 @@
   },
   "dashboard.show-temperature": {
     "type": "enum",
-    "description": "Ambient temperature widget visibility (warning = only when below 10 °C)",
+    "description": "Ambient temperature widget visibility (warning = only when below 10 \u00b0C)",
     "label": "Temperature",
     "user-visible": true,
     "service": "scootui",
@@ -1388,5 +1388,42 @@
     "service": "update-service",
     "default": "https://downloads.librescoot.org/releases",
     "example": "https://downloads.librescoot.org/releases"
+  },
+  "trip.counter-reset": {
+    "type": "enum",
+    "description": "When to reset the trip counter",
+    "label": "Trip Counter Reset",
+    "user-visible": true,
+    "service": "trip-service",
+    "default": "ride",
+    "values": [
+      {
+        "value": "ride",
+        "label": "After Each Ride"
+      },
+      {
+        "value": "day",
+        "label": "Daily"
+      },
+      {
+        "value": "battery",
+        "label": "On Battery Change"
+      },
+      {
+        "value": "manual",
+        "label": "Manually"
+      }
+    ],
+    "example": "ride"
+  },
+  "trip.expunge": {
+    "type": "string",
+    "format": "trip-expunge",
+    "description": "When to expunge completed trip history",
+    "label": "Trip History Retention",
+    "user-visible": true,
+    "service": "trip-service",
+    "default": "age:365d",
+    "example": "age:365d"
   }
 }

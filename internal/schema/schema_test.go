@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"path/filepath"
 	"testing"
 )
 
@@ -219,6 +220,104 @@ func TestTransient(t *testing.T) {
 	if defaults["alarm.enabled"] != "true" {
 		t.Errorf("Defaults() should keep non-transient keys, got %v", defaults)
 	}
+}
+
+func TestTripCounterResetSchema(t *testing.T) {
+	s, err := LoadFile(filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("LoadFile() error: %v", err)
+	}
+
+	setting, ok := s.Settings["trip.counter-reset"]
+	if !ok {
+		t.Fatal("trip.counter-reset is missing")
+	}
+	if setting.Type != "enum" {
+		t.Errorf("type = %q, want %q", setting.Type, "enum")
+	}
+	if !setting.UserVisible {
+		t.Error("trip.counter-reset should be user-visible")
+	}
+	if setting.ReadOnly {
+		t.Error("trip.counter-reset should be writable")
+	}
+	if setting.Service != "trip-service" {
+		t.Errorf("service = %q, want %q", setting.Service, "trip-service")
+	}
+	if setting.Default != "ride" {
+		t.Errorf("default = %v, want %q", setting.Default, "ride")
+	}
+	if got := s.Defaults()["trip.counter-reset"]; got != "ride" {
+		t.Errorf("Defaults()[trip.counter-reset] = %q, want %q", got, "ride")
+	}
+
+	if len(setting.Values) != 4 {
+		t.Errorf("values count = %d, want 4", len(setting.Values))
+	}
+	for _, value := range []string{"ride", "day", "battery", "manual"} {
+		if !enumContains(setting.Values, value) {
+			t.Errorf("valid value %q is missing", value)
+		}
+	}
+	if enumContains(setting.Values, "unknown") {
+		t.Error("unknown must be rejected by enum validation")
+	}
+	for _, value := range []string{"ride", "day", "battery", "manual"} {
+		if err := s.ValidateValue("trip.counter-reset", value); err != nil {
+			t.Errorf("ValidateValue(%q) error: %v", value, err)
+		}
+	}
+	if err := s.ValidateValue("trip.counter-reset", "sometimes"); err == nil {
+		t.Error("ValidateValue accepted invalid counter reset policy")
+	}
+	if !s.HasValidation("trip.counter-reset") {
+		t.Error("trip.counter-reset should require production validation")
+	}
+	if got, ok := s.DefaultValue("trip.counter-reset"); !ok || got != "ride" {
+		t.Errorf("DefaultValue(trip.counter-reset) = %q, %v; want ride, true", got, ok)
+	}
+}
+
+func TestTripExpungeSchema(t *testing.T) {
+	s, err := LoadFile(filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("LoadFile() error: %v", err)
+	}
+
+	setting, ok := s.Settings["trip.expunge"]
+	if !ok {
+		t.Fatal("trip.expunge is missing")
+	}
+	if setting.Type != "string" {
+		t.Errorf("type = %q, want %q", setting.Type, "string")
+	}
+	if setting.Format != TripExpungeFormat {
+		t.Errorf("format = %q, want %q", setting.Format, TripExpungeFormat)
+	}
+	if !setting.UserVisible {
+		t.Error("trip.expunge should be user-visible")
+	}
+	if setting.ReadOnly {
+		t.Error("trip.expunge should be writable")
+	}
+	if setting.Service != "trip-service" {
+		t.Errorf("service = %q, want %q", setting.Service, "trip-service")
+	}
+	if setting.Default != "age:365d" {
+		t.Errorf("default = %v, want %q", setting.Default, "age:365d")
+	}
+	if got := s.Defaults()["trip.expunge"]; got != "age:365d" {
+		t.Errorf("Defaults()[trip.expunge] = %q, want %q", got, "age:365d")
+	}
+}
+
+func enumContains(values []EnumValue, want string) bool {
+	for _, value := range values {
+		if value.Value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestRawBytes(t *testing.T) {
