@@ -235,6 +235,15 @@
     "default": false,
     "example": true
   },
+  "scooter.open-seatbox-on-unlock": {
+    "type": "bool",
+    "description": "Open the seatbox automatically when the scooter is unlocked, by any path: app or cloud unlock request, keycard tap, or hop-on release. There is no close command, so the lid has to be pushed shut by hand, and an open seatbox makes a lock request wait in the waiting-seatbox state first. Intended for advanced users; set it with lsc, not from the dashboard menu.",
+    "label": "Open Seatbox on Unlock",
+    "user-visible": false,
+    "service": "vehicle-service",
+    "default": false,
+    "example": true
+  },
   "scooter.dbc-blinker-led": {
     "type": "enum",
     "description": "Flash the DBC boot LED with the blinkers: green for individual blinkers and red for hazards.",
