@@ -1217,6 +1217,71 @@
     "pattern": "indexed",
     "example": "2025-01-15T12:00:00Z"
   },
+  "dashboard.route-plan.0.latitude": {
+    "type": "float",
+    "description": "Store the latitude of an indexed stop in the dashboard's active multi-hop route plan.",
+    "label": "Route Plan Stop Latitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -90,
+    "max": 90,
+    "example": 52.52
+  },
+  "dashboard.route-plan.0.longitude": {
+    "type": "float",
+    "description": "Store the longitude of an indexed stop in the dashboard's active multi-hop route plan.",
+    "label": "Route Plan Stop Longitude",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "min": -180,
+    "max": 180,
+    "example": 13.405
+  },
+  "dashboard.route-plan.0.label": {
+    "type": "string",
+    "description": "Store the display name of an indexed stop in the dashboard's active multi-hop route plan.",
+    "label": "Route Plan Stop Name",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "Alexanderplatz"
+  },
+  "dashboard.route-plan.0.reached": {
+    "type": "bool",
+    "description": "Whether an indexed stop in the active route plan has already been reached.",
+    "label": "Route Plan Stop Reached",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": false
+  },
+  "dashboard.route-plan.current-step": {
+    "type": "integer",
+    "description": "Index of the stop the dashboard is currently guiding to within the active route plan.",
+    "label": "Route Plan Current Step",
+    "user-visible": false,
+    "service": "scootui",
+    "min": 0,
+    "example": 0
+  },
+  "dashboard.route-plan.active": {
+    "type": "bool",
+    "description": "Whether the persisted route plan is an in-progress trip that may be resumed.",
+    "label": "Route Plan Active",
+    "user-visible": false,
+    "service": "scootui",
+    "example": true
+  },
+  "dashboard.route-plan.updated-at": {
+    "type": "string",
+    "description": "Store the ISO 8601 timestamp of the last change to the active route plan.",
+    "label": "Route Plan Updated Time",
+    "user-visible": false,
+    "service": "scootui",
+    "example": "2026-09-18T12:00:00Z"
+  },
   "engine-ecu.boost": {
     "type": "bool",
     "description": "Enable motor boost mode.",

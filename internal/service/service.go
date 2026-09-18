@@ -315,6 +315,7 @@ func isIndexedRecordNotification(key string) bool {
 	for _, prefix := range []string{
 		"dashboard.saved-locations.",
 		"dashboard.recent-destinations.",
+		"dashboard.route-plan.",
 	} {
 		if !strings.HasPrefix(key, prefix) {
 			continue

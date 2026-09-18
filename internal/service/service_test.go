@@ -237,6 +237,41 @@ func TestFilterUserSet(t *testing.T) {
 			},
 		},
 		{
+			name: "route plan notification keeps the complete stop record",
+			settings: map[string]string{
+				"dashboard.route-plan.0.latitude":  "52.51",
+				"dashboard.route-plan.0.longitude": "13.41",
+				"dashboard.route-plan.0.label":     "Work",
+				"dashboard.route-plan.0.reached":   "false",
+				"dashboard.route-plan.1.latitude":  "52.52",
+				"dashboard.theme":                   "dark",
+			},
+			userSet: map[string]struct{}{
+				"dashboard.route-plan.0": {},
+			},
+			want: map[string]string{
+				"dashboard.route-plan.0.latitude":  "52.51",
+				"dashboard.route-plan.0.longitude": "13.41",
+				"dashboard.route-plan.0.label":     "Work",
+				"dashboard.route-plan.0.reached":   "false",
+			},
+		},
+		{
+			name: "route plan deletion drops the persisted stop record",
+			settings: map[string]string{
+				"dashboard.route-plan.current-step": "1",
+			},
+			userSet: map[string]struct{}{
+				"dashboard.route-plan.0":              {},
+				"dashboard.route-plan.0.latitude":     {},
+				"dashboard.route-plan.0.longitude":    {},
+				"dashboard.route-plan.current-step":   {},
+			},
+			want: map[string]string{
+				"dashboard.route-plan.current-step": "1",
+			},
+		},
+		{
 			name:     "saved location deletion drops the persisted record",
 			settings: map[string]string{},
 			userSet: map[string]struct{}{
