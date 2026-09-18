@@ -1324,11 +1324,27 @@
   },
   "updates.mdb.last-check-time": {
     "type": "string",
-    "description": "Report the ISO 8601 timestamp of the last MDB update check.",
+    "description": "Report the ISO 8601 timestamp of the last completed MDB update check. Failed or unconfigured attempts are recorded in the attempt fields instead.",
     "label": "Last MDB Update Check",
     "user-visible": false,
     "service": "update-service",
     "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.mdb.last-attempt-time": {
+    "type": "string",
+    "description": "Report the ISO 8601 timestamp of the last MDB update check attempt, whether or not it completed.",
+    "label": "Last MDB Update Check Attempt",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.mdb.last-attempt-result": {
+    "type": "string",
+    "description": "Report the outcome of the last MDB update check attempt (running, update-started, up-to-date, no-release, no-asset, backed-off, releases-unavailable, settings-unavailable or channel-not-configured).",
+    "label": "Last MDB Update Check Result",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "up-to-date"
   },
   "updates.mdb.dry-run": {
     "type": "bool",
@@ -1414,11 +1430,27 @@
   },
   "updates.dbc.last-check-time": {
     "type": "string",
-    "description": "Report the ISO 8601 timestamp of the last DBC update check.",
+    "description": "Report the ISO 8601 timestamp of the last completed DBC update check. Failed or unconfigured attempts are recorded in the attempt fields instead.",
     "label": "Last DBC Update Check",
     "user-visible": false,
     "service": "update-service",
     "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.dbc.last-attempt-time": {
+    "type": "string",
+    "description": "Report the ISO 8601 timestamp of the last DBC update check attempt, whether or not it completed.",
+    "label": "Last DBC Update Check Attempt",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "2025-01-15T10:30:00Z"
+  },
+  "updates.dbc.last-attempt-result": {
+    "type": "string",
+    "description": "Report the outcome of the last DBC update check attempt (running, update-started, up-to-date, no-release, no-asset, backed-off, releases-unavailable, settings-unavailable or channel-not-configured).",
+    "label": "Last DBC Update Check Result",
+    "user-visible": false,
+    "service": "update-service",
+    "example": "up-to-date"
   },
   "updates.dbc.dry-run": {
     "type": "bool",
