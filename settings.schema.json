@@ -574,8 +574,8 @@
   },
   "dashboard.speedometer.warn-speed": {
     "type": "int",
-    "description": "Set the speed at which the speedometer fill reaches the base colour and starts shifting toward the warning colour. This must be below the overspeed threshold.",
-    "label": "Speedometer Warning Speed",
+    "description": "Set the speed where the fill reaches the base colour. Below this point it transitions from a lighter tint to the base colour; above it, it transitions toward the warning colour. This must be below the overspeed threshold.",
+    "label": "Speedometer Fill Transition Speed",
     "user-visible": false,
     "service": "scootui",
     "default": 55,
@@ -586,7 +586,7 @@
   },
   "dashboard.speedometer.base-color": {
     "type": "string",
-    "description": "Set the speedometer fill colour at the warning speed. Below it the fill ramps up from a lightened tint of the same hue, and above it it shifts toward the warning colour. Use #RRGGBB or #AARRGGBB.",
+    "description": "Set the main speedometer fill colour. The fill reaches this colour at the colour transition speed and uses progressively lighter tints at lower speeds. Use #RRGGBB or #AARRGGBB.",
     "label": "Speedometer Base Color",
     "user-visible": false,
     "service": "scootui",
@@ -595,7 +595,7 @@
   },
   "dashboard.speedometer.warn-color": {
     "type": "string",
-    "description": "Set the colour the speedometer fill shifts to at the warning speed. Pick a hue that stays distinguishable from the base colour. Use #RRGGBB or #AARRGGBB.",
+    "description": "Set the fill colour reached at the overspeed threshold. Above the threshold, the fill pulses between this colour and the overspeed pulse colour. Use #RRGGBB or #AARRGGBB.",
     "label": "Speedometer Warning Color",
     "user-visible": false,
     "service": "scootui",
@@ -616,8 +616,8 @@
   },
   "dashboard.speedometer.overspeed-color": {
     "type": "string",
-    "description": "Set the colour the speedometer fill pulses toward while the overspeed threshold is exceeded. Use #RRGGBB or #AARRGGBB.",
-    "label": "Speedometer Overspeed Color",
+    "description": "Set the second fill colour used by the pulse above the overspeed threshold. The pulse alternates between the warning colour and this colour. Use #RRGGBB or #AARRGGBB.",
+    "label": "Speedometer Overspeed Pulse Color",
     "user-visible": false,
     "service": "scootui",
     "default": "#E91E63",
