@@ -572,10 +572,40 @@
     "max": 200,
     "example": 80
   },
+  "dashboard.speedometer.origin-color": {
+    "type": "string",
+    "description": "Set the speedometer fill colour at 0 km/h. The fill transitions from this colour to the normal arc colour as speed approaches the normal-range speed. Use #RRGGBB or #AARRGGBB.",
+    "label": "Speedometer Origin Color",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "#90CAF9",
+    "example": "#90CAF9"
+  },
+  "dashboard.speedometer.normal-speed": {
+    "type": "int",
+    "description": "Set the speed where the fill reaches the normal arc colour and starts transitioning toward the warning colour. This must be below the warning speed.",
+    "label": "Speedometer Normal-Range Speed",
+    "user-visible": false,
+    "service": "scootui",
+    "default": 30,
+    "unit": "km/h",
+    "min": 1,
+    "max": 200,
+    "example": 35
+  },
+  "dashboard.speedometer.base-color": {
+    "type": "string",
+    "description": "Set the normal arc colour reached at the normal-range speed. The fill transitions from the origin colour below this point and toward the warning colour above it. Use #RRGGBB or #AARRGGBB.",
+    "label": "Speedometer Normal Arc Color",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "#2196F3",
+    "example": "#2196F3"
+  },
   "dashboard.speedometer.warn-speed": {
     "type": "int",
-    "description": "Set the speed where the fill reaches the base colour. Below this point it transitions from a lighter tint to the base colour; above it, it transitions toward the warning colour. This must be below the overspeed threshold.",
-    "label": "Speedometer Fill Transition Speed",
+    "description": "Set the speed where the fill reaches the warning colour and starts transitioning toward the overspeed colour. This must be above the normal-range speed and below the overspeed threshold.",
+    "label": "Speedometer Warning Speed",
     "user-visible": false,
     "service": "scootui",
     "default": 55,
@@ -584,18 +614,9 @@
     "max": 200,
     "example": 70
   },
-  "dashboard.speedometer.base-color": {
-    "type": "string",
-    "description": "Set the main speedometer fill colour. The fill reaches this colour at the colour transition speed and uses progressively lighter tints at lower speeds. Use #RRGGBB or #AARRGGBB.",
-    "label": "Speedometer Base Color",
-    "user-visible": false,
-    "service": "scootui",
-    "default": "#2196F3",
-    "example": "#2196F3"
-  },
   "dashboard.speedometer.warn-color": {
     "type": "string",
-    "description": "Set the fill colour reached at the overspeed threshold. Above the threshold, the fill pulses between this colour and the overspeed pulse colour. Use #RRGGBB or #AARRGGBB.",
+    "description": "Set the fill colour reached at the warning speed. Above this point, the fill transitions toward the overspeed colour. Use #RRGGBB or #AARRGGBB.",
     "label": "Speedometer Warning Color",
     "user-visible": false,
     "service": "scootui",
@@ -604,7 +625,7 @@
   },
   "dashboard.speedometer.overspeed": {
     "type": "int",
-    "description": "Set the speed above which the speedometer fill pulses between the warning colour and the overspeed colour.",
+    "description": "Set the speed where the fill reaches the overspeed colour. Above this threshold, the fill pulses between the warning and overspeed colours.",
     "label": "Speedometer Overspeed Threshold",
     "user-visible": false,
     "service": "scootui",
@@ -616,8 +637,8 @@
   },
   "dashboard.speedometer.overspeed-color": {
     "type": "string",
-    "description": "Set the second fill colour used by the pulse above the overspeed threshold. The pulse alternates between the warning colour and this colour. Use #RRGGBB or #AARRGGBB.",
-    "label": "Speedometer Overspeed Pulse Color",
+    "description": "Set the fill colour reached at the overspeed threshold. Above the threshold, the fill pulses between the warning colour and this colour. Use #RRGGBB or #AARRGGBB.",
+    "label": "Speedometer Overspeed Color",
     "user-visible": false,
     "service": "scootui",
     "default": "#E91E63",
