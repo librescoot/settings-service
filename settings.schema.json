@@ -316,7 +316,7 @@
   },
   "pm.suspend-when-online": {
     "type": "bool",
-    "description": "Allow a locked scooter without a main battery to suspend while connectivity remains available. A main battery in either slot prevents suspend regardless of this setting.",
+    "description": "Only relevant without a main battery: a main battery in either slot always blocks suspend. \"Online\" means an active remote-access provider (Sunshine via radio-gaga, a Librescoot uplink server, or any other provider reporting connected). Default true lets a locked scooter suspend even while remotely reachable; set false to stay awake while remote access is connected, at the cost of draining the auxiliary battery within a few days.",
     "label": "Allow Suspend While Online",
     "user-visible": false,
     "service": "pm-service",
