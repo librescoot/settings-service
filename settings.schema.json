@@ -1199,6 +1199,15 @@
     "pattern": "indexed",
     "example": "Home"
   },
+  "dashboard.saved-locations.0.uuid": {
+    "type": "string",
+    "description": "Store the stable UUID of an indexed saved location.",
+    "label": "Saved Location UUID",
+    "user-visible": false,
+    "service": "scootui",
+    "pattern": "indexed",
+    "example": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+  },
   "dashboard.saved-locations.0.latitude": {
     "type": "float",
     "description": "Store the latitude of an indexed saved location in decimal degrees.",
