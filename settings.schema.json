@@ -316,8 +316,8 @@
   },
   "pm.suspend-when-online": {
     "type": "bool",
-    "description": "Only relevant without a main battery: a main battery in either slot always blocks suspend. \"Online\" means an active remote-access provider (Sunshine via radio-gaga, a Librescoot uplink server, or any other provider reporting connected). Default true lets a locked scooter suspend even while remotely reachable; set false to stay awake while remote access is connected, at the cost of draining the auxiliary battery within a few days.",
-    "label": "Suspend Without Main Battery While Remotely Reachable",
+    "description": "Only relevant without a main battery: a main battery in either slot always blocks suspend. \"Online\" means an active remote-access provider (Sunshine via radio-gaga, a Librescoot uplink server, or any other provider reporting connected). Default true lets a locked scooter suspend even while remotely accessible; set false to stay awake while remote access is connected, at the cost of draining the auxiliary battery within a few days.",
+    "label": "Suspend Without Main Battery While Remotely Accessible",
     "user-visible": false,
     "service": "pm-service",
     "default": true,
@@ -490,9 +490,9 @@
     "default": "en",
     "example": "en"
   },
-  "dashboard.developer-mode": {
+  "scooter.developer-mode": {
     "type": "bool",
-    "description": "Enable dashboard controls intended for development and diagnostics. The default is enabled when either installed component runs testing or nightly, and disabled when both run stable.",
+    "description": "Enable development and diagnostic controls. The default is enabled when either installed component runs testing or nightly, and disabled when both run stable.",
     "label": "Developer Mode",
     "user-visible": false,
     "service": "scootui-qt",
