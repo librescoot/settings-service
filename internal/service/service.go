@@ -110,6 +110,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		fields[key] = fallback
 		userSet[key] = struct{}{}
 	}
+	s.applyChannelDefaults(fields, userSet)
 	s.userSetKeys = userSet
 	rewriteToml = len(droppedTransient) > 0 || len(invalid) > 0
 	if rewriteToml {
@@ -246,6 +247,35 @@ func cloneStringMap(in map[string]string) map[string]string {
 		out[key] = value
 	}
 	return out
+}
+
+// applyChannelDefaults selects schema defaults from the installed MDB and DBC
+// release channels. A persisted value always takes precedence over this default.
+func (s *SettingsService) applyChannelDefaults(fields map[string]any, userSet map[string]struct{}) {
+	if s.schema == nil {
+		return
+	}
+
+	var channels []string
+	for _, component := range []string{"mdb", "dbc"} {
+		version, exists, err := s.redisClient.GetHashField("version:"+component, "version_id")
+		if err != nil {
+			log.Printf("Unable to read %s installed version: %v", component, err)
+			continue
+		}
+		if !exists {
+			continue
+		}
+		if channel := schema.ReleaseChannel(version); channel != "" {
+			channels = append(channels, channel)
+		}
+	}
+
+	for key, value := range s.schema.ChannelDefaults(channels) {
+		if _, isUserSet := userSet[key]; !isUserSet {
+			fields[key] = value
+		}
+	}
 }
 
 func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string]any, userSet map[string]struct{}) (droppedTransient []string, invalid map[string]string) {

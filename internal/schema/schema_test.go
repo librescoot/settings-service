@@ -170,6 +170,61 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestChannelDefaults(t *testing.T) {
+	const settingsJSON = `{
+  "dashboard.developer-mode": {
+    "type": "bool",
+    "default": false,
+    "channel-defaults": {
+      "stable": false,
+      "testing": true,
+      "nightly": true
+    }
+  }
+}`
+	s, err := Parse([]byte(settingsJSON))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	for _, tc := range []struct {
+		name     string
+		channels []string
+		want     string
+	}{
+		{"stable", []string{"stable"}, "false"},
+		{"testing", []string{"testing"}, "true"},
+		{"nightly", []string{"nightly"}, "true"},
+		{"mixed components", []string{"stable", "testing"}, "true"},
+		{"unknown", []string{"unknown"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := s.ChannelDefaults(tc.channels)["dashboard.developer-mode"]
+			if got != tc.want {
+				t.Errorf("ChannelDefaults(%v) = %q, want %q", tc.channels, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestReleaseChannel(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		want    string
+	}{
+		{"nightly-20260921T120000", "nightly"},
+		{"testing-20260921T120000", "testing"},
+		{"v1.4.0", "stable"},
+		{"1.4.0", "stable"},
+		{"", ""},
+		{"custom-20260921", ""},
+	} {
+		if got := ReleaseChannel(tc.version); got != tc.want {
+			t.Errorf("ReleaseChannel(%q) = %q, want %q", tc.version, got, tc.want)
+		}
+	}
+}
+
 func TestTransient(t *testing.T) {
 	const transientJSON = `{
   "alarm.enabled": {

@@ -244,7 +244,7 @@ func TestFilterUserSet(t *testing.T) {
 				"dashboard.route-plan.0.label":     "Work",
 				"dashboard.route-plan.0.reached":   "false",
 				"dashboard.route-plan.1.latitude":  "52.52",
-				"dashboard.theme":                   "dark",
+				"dashboard.theme":                  "dark",
 			},
 			userSet: map[string]struct{}{
 				"dashboard.route-plan.0": {},
@@ -262,10 +262,10 @@ func TestFilterUserSet(t *testing.T) {
 				"dashboard.route-plan.current-step": "1",
 			},
 			userSet: map[string]struct{}{
-				"dashboard.route-plan.0":              {},
-				"dashboard.route-plan.0.latitude":     {},
-				"dashboard.route-plan.0.longitude":    {},
-				"dashboard.route-plan.current-step":   {},
+				"dashboard.route-plan.0":            {},
+				"dashboard.route-plan.0.latitude":   {},
+				"dashboard.route-plan.0.longitude":  {},
+				"dashboard.route-plan.current-step": {},
 			},
 			want: map[string]string{
 				"dashboard.route-plan.current-step": "1",
@@ -391,6 +391,48 @@ func TestLoadSettingsFromTOMLRepairsInvalidTripExpunge(t *testing.T) {
 	}
 	if got := cfg.ToRedisFields()["trip.expunge"]; got != "age:1d" {
 		t.Errorf("repaired TOML trip.expunge = %v, want age:1d", got)
+	}
+}
+
+func TestLoadSettingsFromTOMLUsesComponentChannelDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		mdb  string
+		dbc  string
+		toml string
+		want string
+	}{
+		{"stable", "v1.4.0", "v1.4.0", "", "false"},
+		{"testing MDB", "testing-20260921T120000", "v1.4.0", "", "true"},
+		{"nightly DBC", "v1.4.0", "nightly-20260921T120000", "", "true"},
+		{"user override", "nightly-20260921T120000", "v1.4.0", "[dashboard]\ndeveloper-mode = false\n", "false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := miniredis.RunT(t)
+			server.HSet("version:mdb", "version_id", tc.mdb)
+			server.HSet("version:dbc", "version_id", tc.dbc)
+			originalTomlPath := config.TomlFilePath
+			config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+			t.Cleanup(func() { config.TomlFilePath = originalTomlPath })
+			if tc.toml != "" {
+				if err := os.WriteFile(config.TomlFilePath, []byte(tc.toml), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			svc, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+			t.Cleanup(svc.Close)
+			if err := svc.LoadSettingsFromTOML(); err != nil {
+				t.Fatalf("LoadSettingsFromTOML() error: %v", err)
+			}
+			got, exists, err := svc.redisClient.GetSettingField("dashboard.developer-mode")
+			if err != nil || !exists || got != tc.want {
+				t.Errorf("developer-mode = %q, exists=%v, err=%v; want %q", got, exists, err, tc.want)
+			}
+		})
 	}
 }
 

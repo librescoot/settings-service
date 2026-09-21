@@ -490,6 +490,20 @@
     "default": "en",
     "example": "en"
   },
+  "dashboard.developer-mode": {
+    "type": "bool",
+    "description": "Enable dashboard controls intended for development and diagnostics. The default is enabled when either installed component runs testing or nightly, and disabled when both run stable.",
+    "label": "Developer Mode",
+    "user-visible": false,
+    "service": "scootui-qt",
+    "default": false,
+    "channel-defaults": {
+      "stable": false,
+      "testing": true,
+      "nightly": true
+    },
+    "example": true
+  },
   "dashboard.theme": {
     "type": "enum",
     "description": "Choose the dashboard color theme.",

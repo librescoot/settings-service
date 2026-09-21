@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type EnumValue struct {
@@ -13,21 +14,22 @@ type EnumValue struct {
 }
 
 type Setting struct {
-	Type        string      `json:"type"`
-	Description string      `json:"description"`
-	Label       string      `json:"label,omitempty"`
-	UserVisible bool        `json:"user-visible,omitempty"`
-	Service     string      `json:"service,omitempty"`
-	Default     any         `json:"default,omitempty"`
-	Values      []EnumValue `json:"values,omitempty"`
-	Unit        string      `json:"unit,omitempty"`
-	Min         *float64    `json:"min,omitempty"`
-	Max         *float64    `json:"max,omitempty"`
-	Example     any         `json:"example,omitempty"`
-	ReadOnly    bool        `json:"read-only,omitempty"`
-	Pattern     string      `json:"pattern,omitempty"`
-	Format      string      `json:"format,omitempty"`
-	Transient   bool        `json:"transient,omitempty"`
+	Type            string          `json:"type"`
+	Description     string          `json:"description"`
+	Label           string          `json:"label,omitempty"`
+	UserVisible     bool            `json:"user-visible,omitempty"`
+	Service         string          `json:"service,omitempty"`
+	Default         any             `json:"default,omitempty"`
+	Values          []EnumValue     `json:"values,omitempty"`
+	Unit            string          `json:"unit,omitempty"`
+	Min             *float64        `json:"min,omitempty"`
+	Max             *float64        `json:"max,omitempty"`
+	Example         any             `json:"example,omitempty"`
+	ReadOnly        bool            `json:"read-only,omitempty"`
+	Pattern         string          `json:"pattern,omitempty"`
+	Format          string          `json:"format,omitempty"`
+	Transient       bool            `json:"transient,omitempty"`
+	ChannelDefaults map[string]bool `json:"channel-defaults,omitempty"`
 }
 
 type Schema struct {
@@ -104,6 +106,51 @@ func (s *Schema) DefaultValue(key string) (string, bool) {
 		return "", false
 	}
 	return fmt.Sprintf("%v", setting.Default), true
+}
+
+// ChannelDefaults returns defaults selected by any installed component channel.
+// A true value wins if components are on different channels, so development
+// capabilities remain available while either board is on testing or nightly.
+func (s *Schema) ChannelDefaults(channels []string) map[string]string {
+	defaults := make(map[string]string)
+	if s == nil {
+		return defaults
+	}
+	for key, setting := range s.Settings {
+		matched := false
+		value := false
+		for _, channel := range channels {
+			channelValue, ok := setting.ChannelDefaults[channel]
+			if !ok {
+				continue
+			}
+			matched = true
+			value = value || channelValue
+		}
+		if matched {
+			defaults[key] = fmt.Sprintf("%t", value)
+		}
+	}
+	return defaults
+}
+
+// ReleaseChannel infers the installed release channel from an image version.
+func ReleaseChannel(version string) string {
+	fields := strings.Fields(version)
+	if len(fields) == 0 {
+		return ""
+	}
+	version = strings.ToLower(fields[0])
+	switch {
+	case strings.HasPrefix(version, "nightly-"):
+		return "nightly"
+	case strings.HasPrefix(version, "testing-"):
+		return "testing"
+	case strings.HasPrefix(version, "v"), version[0] >= '0' && version[0] <= '9':
+		return "stable"
+	default:
+		return ""
+	}
 }
 
 // Defaults includes transient defaults because transient controls persistence,

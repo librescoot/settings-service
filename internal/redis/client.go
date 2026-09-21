@@ -128,7 +128,11 @@ func (c *Client) BRPopOverlay() (string, error) {
 }
 
 func (c *Client) GetSettingField(field string) (value string, existed bool, err error) {
-	v, err := c.client.HGet(c.ctx, SettingsKey, field).Result()
+	return c.GetHashField(SettingsKey, field)
+}
+
+func (c *Client) GetHashField(key, field string) (value string, existed bool, err error) {
+	v, err := c.client.HGet(c.ctx, key, field).Result()
 	if err == redis.Nil {
 		return "", false, nil
 	}

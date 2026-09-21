@@ -67,6 +67,8 @@ apn = "example.apn"
 
 Transient schema keys remain in Redis and are removed from TOML when encountered. The service preserves the effective base value rather than its temporary overlay value when saving while service mode is active.
 
+A boolean schema setting can provide `channel-defaults` for `stable`, `testing`, and `nightly`. At boot, settings-service infers each installed component's channel from `version:mdb[version_id]` and `version:dbc[version_id]`, then applies the matching value unless TOML contains a user-set value. If components differ, a `true` value from either component wins. `dashboard.developer-mode` uses this to enable dashboard diagnostics by default on testing or nightly.
+
 For APN management, NetworkManager and the target WWAN connection must be available. WireGuard configuration files must have a `.conf` suffix in `/data/wireguard`; SHA-256 sidecar files are maintained in the same directory.
 
 ## Build and test
