@@ -30,6 +30,11 @@ type SettingsService struct {
 	overlayBase   map[string]capturedVal
 
 	lastPersisted map[string]string
+
+	osReleasePath                 string
+	localReleaseChannel           string
+	generatedChannelDefaults      map[string]string
+	pendingGeneratedNotifications map[string]string
 }
 
 func New(redisAddr, schemaPath string) (*SettingsService, error) {
@@ -53,11 +58,14 @@ func New(redisAddr, schemaPath string) (*SettingsService, error) {
 	}
 
 	return &SettingsService{
-		redisClient: redisClient,
-		schema:      s,
-		ctx:         ctx,
-		cancel:      cancel,
-		userSetKeys: make(map[string]struct{}),
+		redisClient:                   redisClient,
+		schema:                        s,
+		ctx:                           ctx,
+		cancel:                        cancel,
+		userSetKeys:                   make(map[string]struct{}),
+		osReleasePath:                 defaultOSReleasePath,
+		generatedChannelDefaults:      make(map[string]string),
+		pendingGeneratedNotifications: make(map[string]string),
 	}, nil
 }
 
@@ -110,7 +118,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		fields[key] = fallback
 		userSet[key] = struct{}{}
 	}
-	s.applyChannelDefaults(fields, userSet)
+	s.applyInitialChannelDefaults(fields, userSet)
 	s.userSetKeys = userSet
 	rewriteToml = len(droppedTransient) > 0 || len(invalid) > 0
 	if rewriteToml {
@@ -249,35 +257,6 @@ func cloneStringMap(in map[string]string) map[string]string {
 	return out
 }
 
-// applyChannelDefaults selects schema defaults from the installed MDB and DBC
-// release channels. A persisted value always takes precedence over this default.
-func (s *SettingsService) applyChannelDefaults(fields map[string]any, userSet map[string]struct{}) {
-	if s.schema == nil {
-		return
-	}
-
-	var channels []string
-	for _, component := range []string{"mdb", "dbc"} {
-		version, exists, err := s.redisClient.GetHashField("version:"+component, "version_id")
-		if err != nil {
-			log.Printf("Unable to read %s installed version: %v", component, err)
-			continue
-		}
-		if !exists {
-			continue
-		}
-		if channel := schema.ReleaseChannel(version); channel != "" {
-			channels = append(channels, channel)
-		}
-	}
-
-	for key, value := range s.schema.ChannelDefaults(channels) {
-		if _, isUserSet := userSet[key]; !isUserSet {
-			fields[key] = value
-		}
-	}
-}
-
 func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string]any, userSet map[string]struct{}) (droppedTransient []string, invalid map[string]string) {
 	invalid = make(map[string]string)
 	for k, v := range toml {
@@ -368,6 +347,7 @@ func (s *SettingsService) markUserSet(field string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.userSetKeys[field] = struct{}{}
+	delete(s.generatedChannelDefaults, field)
 }
 
 // WatchSettings subscribes only after boot hydration so the service does not
@@ -382,9 +362,13 @@ func (s *SettingsService) WatchSettings() {
 			if !ok {
 				return
 			}
-			if msg.Channel == redis.SettingsChannel {
+			switch msg.Channel {
+			case redis.SettingsChannel:
 				log.Printf("Received update notification for field: %s", msg.Payload)
 
+				if s.consumeGeneratedNotification(msg.Payload) {
+					continue
+				}
 				if s.schema.HasValidation(msg.Payload) && !s.reconcileValidatedSetting(msg.Payload) {
 					continue
 				}
@@ -420,6 +404,10 @@ func (s *SettingsService) WatchSettings() {
 
 				if msg.Payload == "scooter.logserver" {
 					s.updateLogServerFromRedis()
+				}
+			case redis.DashboardChannel:
+				if msg.Payload == redis.DashboardReadyField {
+					s.refreshChannelDefaultsWhenDashboardReady()
 				}
 			}
 		case <-s.ctx.Done():

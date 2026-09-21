@@ -213,6 +213,7 @@ func TestReleaseChannel(t *testing.T) {
 		want    string
 	}{
 		{"nightly-20260921T120000", "nightly"},
+		{"custom-nightly-20260921T120000-test-branch", "nightly"},
 		{"testing-20260921T120000", "testing"},
 		{"v1.4.0", "stable"},
 		{"1.4.0", "stable"},

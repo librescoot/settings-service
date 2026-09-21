@@ -409,10 +409,14 @@ func TestLoadSettingsFromTOMLUsesComponentChannelDefaults(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := miniredis.RunT(t)
-			server.HSet("version:mdb", "version_id", tc.mdb)
 			server.HSet("version:dbc", "version_id", tc.dbc)
+			dir := t.TempDir()
+			osReleasePath := filepath.Join(dir, "os-release")
+			if err := os.WriteFile(osReleasePath, []byte("VERSION_ID="+tc.mdb+"\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
 			originalTomlPath := config.TomlFilePath
-			config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+			config.TomlFilePath = filepath.Join(dir, "settings.toml")
 			t.Cleanup(func() { config.TomlFilePath = originalTomlPath })
 			if tc.toml != "" {
 				if err := os.WriteFile(config.TomlFilePath, []byte(tc.toml), 0644); err != nil {
@@ -424,6 +428,7 @@ func TestLoadSettingsFromTOMLUsesComponentChannelDefaults(t *testing.T) {
 			if err != nil {
 				t.Fatalf("New() error: %v", err)
 			}
+			svc.osReleasePath = osReleasePath
 			t.Cleanup(svc.Close)
 			if err := svc.LoadSettingsFromTOML(); err != nil {
 				t.Fatalf("LoadSettingsFromTOML() error: %v", err)

@@ -9,9 +9,12 @@ import (
 )
 
 const (
-	SettingsKey     = "settings"
-	SettingsChannel = "settings"
-	SchemaKey       = "settings:schema"
+	SettingsKey         = "settings"
+	SettingsChannel     = "settings"
+	SchemaKey           = "settings:schema"
+	DashboardKey        = "dashboard"
+	DashboardChannel    = "dashboard"
+	DashboardReadyField = "ready"
 
 	// OverlayList is the command queue for apply:service and clear:service.
 	OverlayList = "settings:overlay"
@@ -42,7 +45,7 @@ func NewClient(ctx context.Context, addr string) (*Client, error) {
 }
 
 func (c *Client) Subscribe() {
-	c.pubsub = c.client.Subscribe(c.ctx, SettingsChannel)
+	c.pubsub = c.client.Subscribe(c.ctx, SettingsChannel, DashboardChannel)
 }
 
 func (c *Client) FlushSettings() error {

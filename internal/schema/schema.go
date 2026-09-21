@@ -142,7 +142,7 @@ func ReleaseChannel(version string) string {
 	}
 	version = strings.ToLower(fields[0])
 	switch {
-	case strings.HasPrefix(version, "nightly-"):
+	case strings.HasPrefix(version, "nightly-"), strings.HasPrefix(version, "custom-nightly-"):
 		return "nightly"
 	case strings.HasPrefix(version, "testing-"):
 		return "testing"
