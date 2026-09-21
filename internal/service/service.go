@@ -229,7 +229,7 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		}
 	}
 
-	cfg := config.ParseRedisSettings(persisted)
+	cfg := config.ParseRedisSettings(persisted, s.schema)
 	if err := config.SaveToFile(cfg); err != nil {
 		return err
 	}

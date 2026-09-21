@@ -527,6 +527,23 @@
     ],
     "example": "auto"
   },
+  "dashboard.shortcut-menu.items": {
+    "type": "array",
+    "description": "Ordered shortcut-menu items. Each entry is a fixed action id (view, theme, debug-overlay, motion-debug, route-overview, skip-stop, stop-navigation) or destination:<uuid>:<icon> for a saved-location shortcut. Array order is display order; entries unavailable at runtime are hidden.",
+    "label": "Shortcut Menu Items",
+    "user-visible": false,
+    "service": "scootui",
+    "format": "shortcut-items",
+    "default": [
+      "view",
+      "theme",
+      "debug-overlay",
+      "motion-debug",
+      "route-overview",
+      "skip-stop",
+      "stop-navigation"
+    ]
+  },
   "dashboard.backlight-mode": {
     "type": "enum",
     "description": "Choose a fixed screen brightness or adjust it automatically using the ambient-light sensor.",

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/librescoot/settings-service/internal/fileutil"
+	"github.com/librescoot/settings-service/internal/schema"
 )
 
 var TomlFilePath = "/data/settings.toml"
@@ -67,7 +69,7 @@ func setNested(m map[string]interface{}, segments []string, value interface{}) {
 	}
 }
 
-func ParseRedisSettings(settings map[string]string) *Config {
+func ParseRedisSettings(settings map[string]string, sch *schema.Schema) *Config {
 	config := &Config{
 		Scooter:   make(map[string]interface{}),
 		Cellular:  make(map[string]interface{}),
@@ -108,10 +110,22 @@ func ParseRedisSettings(settings map[string]string) *Config {
 		default:
 			continue
 		}
-		setNested(section, segs[1:], value)
+		setNested(section, segs[1:], tomlValue(sch, field, value))
 	}
 
 	return config
+}
+
+// tomlValue converts a Redis string into the TOML-side value. Array-typed
+// settings decode from their JSON wire form; everything else stays a string.
+func tomlValue(sch *schema.Schema, field, value string) interface{} {
+	if sch != nil && sch.Settings[field].Type == "array" {
+		var array []interface{}
+		if err := json.Unmarshal([]byte(value), &array); err == nil {
+			return array
+		}
+	}
+	return value
 }
 
 func flattenSection(prefix string, m map[string]interface{}, out map[string]interface{}) {
@@ -120,9 +134,20 @@ func flattenSection(prefix string, m map[string]interface{}, out map[string]inte
 		if sub, ok := v.(map[string]interface{}); ok {
 			flattenSection(key, sub, out)
 		} else {
-			out[key] = fmt.Sprintf("%v", v)
+			out[key] = redisValue(v)
 		}
 	}
+}
+
+// redisValue renders a TOML-side value in its Redis string form. Arrays
+// encode as compact JSON; everything else keeps the plain string form.
+func redisValue(v interface{}) string {
+	if array, ok := v.([]interface{}); ok {
+		if data, err := json.Marshal(array); err == nil {
+			return string(data)
+		}
+	}
+	return fmt.Sprintf("%v", v)
 }
 
 func (c *Config) ToRedisFields() map[string]interface{} {

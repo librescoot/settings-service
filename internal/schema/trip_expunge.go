@@ -19,6 +19,8 @@ func ValidateFormat(format, value string) error {
 		return nil
 	case TripExpungeFormat:
 		return ValidateTripExpunge(value)
+	case ShortcutItemsFormat:
+		return ValidateShortcutItems(value)
 	default:
 		return fmt.Errorf("unsupported setting format %q", format)
 	}

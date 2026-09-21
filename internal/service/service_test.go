@@ -762,3 +762,79 @@ func TestLoadSettingsFromTOMLKeepsOutOfRangeValueLogOnly(t *testing.T) {
 		t.Fatalf("hydrated alarm.duration = %q, exists=%v, err=%v; want 9999 kept", value, exists, err)
 	}
 }
+
+// A native TOML items array hydrates into the compact JSON wire form and
+// persists back as a native ordered array.
+func TestShortcutMenuItemsRoundTripThroughService(t *testing.T) {
+	server := miniredis.RunT(t)
+	originalTomlPath := config.TomlFilePath
+	config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+	t.Cleanup(func() { config.TomlFilePath = originalTomlPath })
+
+	svc, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	t.Cleanup(svc.Close)
+
+	if err := os.WriteFile(config.TomlFilePath,
+		[]byte("[dashboard.shortcut-menu]\nitems = [\"theme\", \"view\"]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.LoadSettingsFromTOML(); err != nil {
+		t.Fatalf("LoadSettingsFromTOML() error: %v", err)
+	}
+
+	value, exists, err := svc.redisClient.GetSettingField("dashboard.shortcut-menu.items")
+	if err != nil || !exists || value != `["theme","view"]` {
+		t.Fatalf("hydrated items = %q, exists=%v, err=%v; want compact JSON", value, exists, err)
+	}
+
+	if err := svc.SaveSettingsToTOML(); err != nil {
+		t.Fatalf("SaveSettingsToTOML() error: %v", err)
+	}
+	cfg, err := config.LoadFromFile()
+	if err != nil {
+		t.Fatalf("LoadFromFile() error: %v", err)
+	}
+	section, ok := cfg.Dashboard["shortcut-menu"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("dashboard.shortcut-menu section missing: %#v", cfg.Dashboard)
+	}
+	items, ok := section["items"].([]interface{})
+	if !ok || len(items) != 2 || items[0] != "theme" || items[1] != "view" {
+		t.Fatalf("persisted items = %#v, want ordered array [theme view]", section["items"])
+	}
+}
+
+// A structurally invalid items list repairs to the schema default instead of
+// reaching Redis.
+func TestLoadSettingsFromTOMLRepairsInvalidShortcutMenuItems(t *testing.T) {
+	server := miniredis.RunT(t)
+	originalTomlPath := config.TomlFilePath
+	config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+	t.Cleanup(func() { config.TomlFilePath = originalTomlPath })
+
+	svc, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	t.Cleanup(svc.Close)
+
+	if err := os.WriteFile(config.TomlFilePath,
+		[]byte("[dashboard.shortcut-menu]\nitems = [\"view\", \"view\"]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.LoadSettingsFromTOML(); err != nil {
+		t.Fatalf("LoadSettingsFromTOML() error: %v", err)
+	}
+
+	value, exists, err := svc.redisClient.GetSettingField("dashboard.shortcut-menu.items")
+	if err != nil || !exists {
+		t.Fatalf("items missing after repair: exists=%v err=%v", exists, err)
+	}
+	want := `["view","theme","debug-overlay","motion-debug","route-overview","skip-stop","stop-navigation"]`
+	if value != want {
+		t.Fatalf("repaired items = %q, want default %q", value, want)
+	}
+}

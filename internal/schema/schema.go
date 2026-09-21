@@ -158,7 +158,18 @@ func (s *Schema) DefaultValue(key string) (string, bool) {
 	if !ok || setting.Default == nil {
 		return "", false
 	}
-	return fmt.Sprintf("%v", setting.Default), true
+	return stringifyDefault(setting.Default), true
+}
+
+// stringifyDefault renders a schema default in its Redis string form. Arrays
+// become compact JSON so the stored value round-trips through TOML as an array.
+func stringifyDefault(value any) string {
+	if array, ok := value.([]any); ok {
+		if data, err := json.Marshal(array); err == nil {
+			return string(data)
+		}
+	}
+	return fmt.Sprintf("%v", value)
 }
 
 // ChannelDefaults returns defaults selected by any installed component channel.
@@ -223,6 +234,8 @@ func (s *Schema) Defaults() map[string]string {
 			}
 		case bool:
 			defaults[key] = fmt.Sprintf("%v", v)
+		case []any:
+			defaults[key] = stringifyDefault(v)
 		default:
 			defaults[key] = fmt.Sprintf("%v", v)
 		}

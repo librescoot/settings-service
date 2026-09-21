@@ -1,7 +1,9 @@
 package schema
 
 import (
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -469,5 +471,70 @@ func TestDefaultsRespectDeclaredTypes(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no defaults were checked")
+	}
+}
+
+func TestValidateShortcutItems(t *testing.T) {
+	uuid := "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+	uuid2 := "0d6c21f0-0000-4000-8000-000000000001"
+
+	for _, value := range []string{
+		`[]`,
+		`["view","theme"]`,
+		`["view","theme","debug-overlay","motion-debug","route-overview","skip-stop","stop-navigation"]`,
+		`["destination:` + uuid + `:home"]`,
+		`["view","destination:` + uuid + `:place","theme"]`,
+		`["destination:` + uuid + `:home","destination:` + uuid2 + `:work"]`,
+		`["destination:` + strings.ToUpper(uuid) + `:favorite"]`,
+	} {
+		if err := ValidateShortcutItems(value); err != nil {
+			t.Errorf("ValidateShortcutItems(%q) error: %v", value, err)
+		}
+	}
+
+	for _, value := range []string{
+		`"view"`,
+		`[1,2]`,
+		`[""]`,
+		`["vew"]`,
+		`["view","view"]`,
+		`["destination:notauuid:home"]`,
+		`["destination:` + uuid + `"]`,
+		`["destination:` + uuid + `:skyscraper"]`,
+		`["destination:` + uuid + `:home:extra"]`,
+		`["destination:` + uuid + `:home","destination:` + strings.ToUpper(uuid) + `:work"]`,
+	} {
+		if err := ValidateShortcutItems(value); err == nil {
+			t.Errorf("ValidateShortcutItems(%q) accepted an invalid value", value)
+		}
+	}
+
+	tooLong := make([]string, maxShortcutItems+1)
+	for i := range tooLong {
+		tooLong[i] = "view"
+	}
+	tooLong[1] = "theme"
+	data, _ := json.Marshal(tooLong)
+	if err := ValidateShortcutItems(string(data)); err == nil {
+		t.Errorf("ValidateShortcutItems accepted %d entries", maxShortcutItems+1)
+	}
+}
+
+// The shipped default must be valid items JSON so hydration, live repair, and
+// the dashboard's fallback all agree on one list.
+func TestShortcutItemsDefaultIsValidJSONArray(t *testing.T) {
+	s, err := LoadFile(filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("LoadFile() error: %v", err)
+	}
+	value, ok := s.DefaultValue("dashboard.shortcut-menu.items")
+	if !ok {
+		t.Fatal("dashboard.shortcut-menu.items has no default")
+	}
+	if err := ValidateShortcutItems(value); err != nil {
+		t.Errorf("default %q is invalid: %v", value, err)
+	}
+	if value != `["view","theme","debug-overlay","motion-debug","route-overview","skip-stop","stop-navigation"]` {
+		t.Errorf("default = %q, want the seven fixed actions in order", value)
 	}
 }
