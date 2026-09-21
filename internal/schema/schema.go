@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type EnumValue struct {
@@ -95,6 +97,57 @@ func (s *Schema) HasValidation(key string) bool {
 	}
 	setting, ok := s.Settings[key]
 	return ok && (setting.Format != "" || len(setting.Values) != 0)
+}
+
+// ValidateTyped checks a value against the setting's declared type and numeric
+// bounds. Callers log violations without rejecting the value: format and enum
+// validation remain the only enforced kinds.
+func (s *Schema) ValidateTyped(key, value string) error {
+	if s == nil {
+		return nil
+	}
+	setting, ok := s.Settings[key]
+	if !ok {
+		return nil
+	}
+	switch setting.Type {
+	case "bool":
+		if value != "true" && value != "false" {
+			return fmt.Errorf("value %q is not a bool", value)
+		}
+		return nil
+	case "int", "integer":
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("value %q is not an int", value)
+		}
+		return checkBounds(setting, float64(parsed))
+	case "float":
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return fmt.Errorf("value %q is not a float", value)
+		}
+		return checkBounds(setting, parsed)
+	case "duration":
+		parsed, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("value %q is not a duration", value)
+		}
+		return checkBounds(setting, parsed.Seconds())
+	default:
+		// string, url, enum, and untyped settings carry no declared bounds.
+		return nil
+	}
+}
+
+func checkBounds(setting Setting, value float64) error {
+	if setting.Min != nil && value < *setting.Min {
+		return fmt.Errorf("value %v is below minimum %v", value, *setting.Min)
+	}
+	if setting.Max != nil && value > *setting.Max {
+		return fmt.Errorf("value %v is above maximum %v", value, *setting.Max)
+	}
+	return nil
 }
 
 func (s *Schema) DefaultValue(key string) (string, bool) {

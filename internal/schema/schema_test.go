@@ -390,3 +390,84 @@ func TestRawBytes(t *testing.T) {
 		t.Error("Raw bytes do not match input")
 	}
 }
+
+func TestValidateTyped(t *testing.T) {
+	s, err := Parse([]byte(`{
+  "alarm.enabled": {"type": "bool", "description": "d", "default": false},
+  "alarm.duration": {"type": "int", "description": "d", "min": 0, "max": 300, "default": 60},
+  "battery.temperature": {"type": "float", "description": "d", "min": -90, "max": 90, "default": 20},
+  "updates.check-interval": {"type": "duration", "description": "d", "min": 0, "default": "6h"},
+  "dashboard.language": {"type": "string", "description": "d", "default": "en"},
+  "dashboard.theme": {"type": "enum", "description": "d", "default": "auto",
+    "values": [{"value": "auto", "label": "Auto"}]}
+}`))
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	for _, tc := range []struct {
+		key   string
+		value string
+	}{
+		{"alarm.enabled", "true"},
+		{"alarm.enabled", "false"},
+		{"alarm.duration", "0"},
+		{"alarm.duration", "300"},
+		{"battery.temperature", "-89.5"},
+		{"battery.temperature", "20"},
+		{"updates.check-interval", "6h"},
+		{"updates.check-interval", "0"},
+		{"dashboard.language", "anything goes"},
+		{"dashboard.theme", "not-checked-by-type"},
+		{"unknown.setting", "whatever"},
+	} {
+		if err := s.ValidateTyped(tc.key, tc.value); err != nil {
+			t.Errorf("ValidateTyped(%q, %q) error: %v", tc.key, tc.value, err)
+		}
+	}
+
+	for _, tc := range []struct {
+		key   string
+		value string
+	}{
+		{"alarm.enabled", "yes"},
+		{"alarm.enabled", "1"},
+		{"alarm.duration", "30.5"},
+		{"alarm.duration", "banana"},
+		{"alarm.duration", "-1"},
+		{"alarm.duration", "301"},
+		{"battery.temperature", "banana"},
+		{"battery.temperature", "-90.1"},
+		{"battery.temperature", "91"},
+		{"updates.check-interval", "10x"},
+		{"updates.check-interval", "-1s"},
+	} {
+		if err := s.ValidateTyped(tc.key, tc.value); err == nil {
+			t.Errorf("ValidateTyped(%q, %q) accepted an invalid value", tc.key, tc.value)
+		}
+	}
+
+	var nilSchema *Schema
+	if err := nilSchema.ValidateTyped("alarm.enabled", "yes"); err != nil {
+		t.Errorf("nil schema ValidateTyped error: %v", err)
+	}
+}
+
+// Every shipped default must satisfy its own declared type and bounds, so a
+// schema entry can never mislabel a value the service then flags at boot.
+func TestDefaultsRespectDeclaredTypes(t *testing.T) {
+	s, err := LoadFile(filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("LoadFile() error: %v", err)
+	}
+	checked := 0
+	for key, value := range s.Defaults() {
+		if err := s.ValidateTyped(key, value); err != nil {
+			t.Errorf("default for %s (%q) violates its declared type: %v", key, value, err)
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no defaults were checked")
+	}
+}

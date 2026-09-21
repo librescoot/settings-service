@@ -734,3 +734,31 @@ func TestMarkUserSet(t *testing.T) {
 		t.Errorf("expected 1 key, got %d", len(s.userSetKeys))
 	}
 }
+
+// Type and range violations are log-only: an out-of-range value hydrates into
+// Redis as-is instead of being repaired like an enum or format violation.
+func TestLoadSettingsFromTOMLKeepsOutOfRangeValueLogOnly(t *testing.T) {
+	server := miniredis.RunT(t)
+	originalTomlPath := config.TomlFilePath
+	config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+	t.Cleanup(func() { config.TomlFilePath = originalTomlPath })
+
+	svc, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	t.Cleanup(svc.Close)
+
+	// alarm.duration declares max 300; 9999 must survive hydration.
+	if err := os.WriteFile(config.TomlFilePath, []byte("[alarm]\nduration = 9999\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.LoadSettingsFromTOML(); err != nil {
+		t.Fatalf("LoadSettingsFromTOML() error: %v", err)
+	}
+
+	value, exists, err := svc.redisClient.GetSettingField("alarm.duration")
+	if err != nil || !exists || value != "9999" {
+		t.Fatalf("hydrated alarm.duration = %q, exists=%v, err=%v; want 9999 kept", value, exists, err)
+	}
+}

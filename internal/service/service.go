@@ -210,6 +210,9 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		if err := s.schema.ValidateValue(key, value); err != nil {
 			return fmt.Errorf("refusing to persist invalid %s value: %w", key, err)
 		}
+		if err := s.schema.ValidateTyped(key, value); err != nil {
+			log.Printf("Schema type violation for %s value %q while persisting (log-only): %v", key, value, err)
+		}
 	}
 	if equalStringMaps(persisted, s.lastPersisted) {
 		return nil
@@ -271,6 +274,9 @@ func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string
 			log.Printf("Ignoring invalid %s value from toml: %v", k, err)
 			invalid[k] = value
 			continue
+		}
+		if err := sch.ValidateTyped(k, value); err != nil {
+			log.Printf("Schema type violation for %s value %q from toml (log-only): %v", k, value, err)
 		}
 		fields[k] = v
 		userSet[k] = struct{}{}
@@ -372,6 +378,7 @@ func (s *SettingsService) WatchSettings() {
 				if s.schema.HasValidation(msg.Payload) && !s.reconcileValidatedSetting(msg.Payload) {
 					continue
 				}
+				s.logTypedViolation(msg.Payload)
 
 				transient := s.schema.IsTransient(msg.Payload)
 				overlaid := s.isOverlaid(msg.Payload)
@@ -413,6 +420,18 @@ func (s *SettingsService) WatchSettings() {
 		case <-s.ctx.Done():
 			return
 		}
+	}
+}
+
+// logTypedViolation reports declared type and bound violations without
+// rejecting the value: format and enum validation are the enforced kinds.
+func (s *SettingsService) logTypedViolation(key string) {
+	value, exists, err := s.redisClient.GetSettingField(key)
+	if err != nil || !exists {
+		return
+	}
+	if err := s.schema.ValidateTyped(key, value); err != nil {
+		log.Printf("Schema type violation for %s value %q (log-only): %v", key, value, err)
 	}
 }
 
