@@ -1,10 +1,11 @@
 module github.com/librescoot/settings-service
 
-go 1.21
+go 1.22.1
 
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/librescoot/redis-ipc v0.15.3
 	github.com/redis/go-redis/v9 v9.18.0
 )
 

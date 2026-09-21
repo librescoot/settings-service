@@ -838,3 +838,48 @@ func TestLoadSettingsFromTOMLRepairsInvalidShortcutMenuItems(t *testing.T) {
 		t.Fatalf("repaired items = %q, want default %q", value, want)
 	}
 }
+
+// A record hydrated without a UUID gets one, and the assignment reaches TOML
+// so the identity survives the next boot.
+func TestLoadSettingsFromTOMLHealsSavedLocationUUIDs(t *testing.T) {
+	server := miniredis.RunT(t)
+	originalTomlPath := config.TomlFilePath
+	config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+	t.Cleanup(func() { config.TomlFilePath = originalTomlPath })
+
+	svc, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	t.Cleanup(svc.Close)
+
+	if err := os.WriteFile(config.TomlFilePath, []byte(
+		"[dashboard.saved-locations.0]\nlatitude = \"52.5000000\"\nlongitude = \"13.4000000\"\nlabel = \"Home\"\n"),
+		0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.LoadSettingsFromTOML(); err != nil {
+		t.Fatalf("LoadSettingsFromTOML() error: %v", err)
+	}
+
+	healed, exists, err := svc.redisClient.GetSettingField("dashboard.saved-locations.0.uuid")
+	if err != nil || !exists || healed == "" {
+		t.Fatalf("healed uuid = %q, exists=%v, err=%v", healed, exists, err)
+	}
+
+	cfg, err := config.LoadFromFile()
+	if err != nil {
+		t.Fatalf("LoadFromFile() error: %v", err)
+	}
+	section, ok := cfg.Dashboard["saved-locations"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("saved-locations section missing: %#v", cfg.Dashboard)
+	}
+	record, ok := section["0"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("record 0 missing: %#v", section)
+	}
+	if record["uuid"] != healed {
+		t.Errorf("persisted uuid = %v, want %q from Redis", record["uuid"], healed)
+	}
+}

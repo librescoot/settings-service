@@ -8,7 +8,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/librescoot/redis-ipc"
 	"github.com/librescoot/settings-service/internal/config"
+	"github.com/librescoot/settings-service/internal/destination"
 	"github.com/librescoot/settings-service/internal/journalupload"
 	"github.com/librescoot/settings-service/internal/network"
 	"github.com/librescoot/settings-service/internal/redis"
@@ -21,6 +23,11 @@ type SettingsService struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
 	mu          sync.Mutex
+
+	// Destination records are managed through the RPC channel, never by
+	// callers writing fields directly.
+	ipcClient  *redis_ipc.Client
+	destServer *destination.Server
 
 	// Only TOML-loaded and runtime user edits persist; schema defaults remain in Redis.
 	userSetKeys map[string]struct{}
@@ -57,8 +64,25 @@ func New(redisAddr, schemaPath string) (*SettingsService, error) {
 		log.Printf("Loaded schema with %d settings", len(s.Settings))
 	}
 
+	host, port, err := destination.ParseAddr(redisAddr)
+	if err != nil {
+		redisClient.Close()
+		cancel()
+		return nil, err
+	}
+	ipcClient, err := redis_ipc.New(redis_ipc.WithAddress(host), redis_ipc.WithPort(port))
+	if err != nil {
+		redisClient.Close()
+		cancel()
+		return nil, fmt.Errorf("failed to connect RPC client: %w", err)
+	}
+	destServer := destination.NewServer(ipcClient)
+	destServer.Start()
+
 	return &SettingsService{
 		redisClient:                   redisClient,
+		ipcClient:                     ipcClient,
+		destServer:                    destServer,
 		schema:                        s,
 		ctx:                           ctx,
 		cancel:                        cancel,
@@ -119,8 +143,11 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		userSet[key] = struct{}{}
 	}
 	s.applyInitialChannelDefaults(fields, userSet)
-	s.userSetKeys = userSet
 	rewriteToml = len(droppedTransient) > 0 || len(invalid) > 0
+	if destination.HealUUIDs(fields, userSet) {
+		rewriteToml = true
+	}
+	s.userSetKeys = userSet
 	if rewriteToml {
 		// Force the repaired TOML to be written even if it matches a prior snapshot.
 		s.lastPersisted = nil
@@ -499,6 +526,12 @@ func (s *SettingsService) updateLogServerFromRedis() {
 }
 
 func (s *SettingsService) Close() {
+	if s.destServer != nil {
+		s.destServer.Stop()
+	}
+	if s.ipcClient != nil {
+		s.ipcClient.Close()
+	}
 	s.cancel()
 	s.redisClient.Close()
 }
