@@ -85,6 +85,17 @@ func TestSaveAllocatesSlotsAndAssignsUUIDs(t *testing.T) {
 	if settings["dashboard.saved-locations.0.label"] != "Home old" {
 		t.Errorf("label = %q, want %q", settings["dashboard.saved-locations.0.label"], "Home old")
 	}
+
+	// An update preserves the record's creation timestamp.
+	ipc.HSet(settingsHash, "dashboard.saved-locations.0.created-at", "2020-01-01T00:00:00Z")
+	callSave(t, ipc, SaveRequest{ID: &id, Latitude: 52.52, Longitude: 13.42, Label: "Home"})
+	created, err := ipc.HGet(settingsHash, "dashboard.saved-locations.0.created-at")
+	if err != nil {
+		t.Fatalf("HGet created-at: %v", err)
+	}
+	if created != "2020-01-01T00:00:00Z" {
+		t.Errorf("created-at = %q, want the pinned value", created)
+	}
 }
 
 func TestSaveRejectsMalformedRequests(t *testing.T) {

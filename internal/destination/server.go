@@ -108,12 +108,16 @@ func (s *Server) save(req SaveRequest) (SaveResponse, error) {
 		}
 	}
 	now := timestamp()
+	createdAt := settings[prefix+".created-at"]
+	if createdAt == "" {
+		createdAt = now
+	}
 	for field, value := range map[string]string{
 		prefix + ".latitude":     strconv.FormatFloat(req.Latitude, 'f', 7, 64),
 		prefix + ".longitude":    strconv.FormatFloat(req.Longitude, 'f', 7, 64),
 		prefix + ".label":        req.Label,
 		prefix + ".uuid":         uuid,
-		prefix + ".created-at":   now,
+		prefix + ".created-at":   createdAt,
 		prefix + ".last-used-at": now,
 	} {
 		if err := s.ipc.HSet(settingsHash, field, value); err != nil {
