@@ -172,7 +172,7 @@ func TestDefaults(t *testing.T) {
 
 func TestChannelDefaults(t *testing.T) {
 	const settingsJSON = `{
-  "dashboard.developer-mode": {
+  "scooter.developer-mode": {
     "type": "bool",
     "default": false,
     "channel-defaults": {
@@ -199,7 +199,7 @@ func TestChannelDefaults(t *testing.T) {
 		{"unknown", []string{"unknown"}, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := s.ChannelDefaults(tc.channels)["dashboard.developer-mode"]
+			got := s.ChannelDefaults(tc.channels)["scooter.developer-mode"]
 			if got != tc.want {
 				t.Errorf("ChannelDefaults(%v) = %q, want %q", tc.channels, got, tc.want)
 			}

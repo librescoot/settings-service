@@ -405,7 +405,7 @@ func TestLoadSettingsFromTOMLUsesComponentChannelDefaults(t *testing.T) {
 		{"stable", "v1.4.0", "v1.4.0", "", "false"},
 		{"testing MDB", "testing-20260921T120000", "v1.4.0", "", "true"},
 		{"nightly DBC", "v1.4.0", "nightly-20260921T120000", "", "true"},
-		{"user override", "nightly-20260921T120000", "v1.4.0", "[dashboard]\ndeveloper-mode = false\n", "false"},
+		{"user override", "nightly-20260921T120000", "v1.4.0", "[scooter]\ndeveloper-mode = false\n", "false"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			server := miniredis.RunT(t)
@@ -428,7 +428,7 @@ func TestLoadSettingsFromTOMLUsesComponentChannelDefaults(t *testing.T) {
 			if err := svc.LoadSettingsFromTOML(); err != nil {
 				t.Fatalf("LoadSettingsFromTOML() error: %v", err)
 			}
-			got, exists, err := svc.redisClient.GetSettingField("dashboard.developer-mode")
+			got, exists, err := svc.redisClient.GetSettingField("scooter.developer-mode")
 			if err != nil || !exists || got != tc.want {
 				t.Errorf("developer-mode = %q, exists=%v, err=%v; want %q", got, exists, err, tc.want)
 			}
