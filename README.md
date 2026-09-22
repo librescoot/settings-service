@@ -32,6 +32,8 @@ On boot the service writes the effective schema defaults and TOML overlay to the
 
 Only these TOML top-level sections are represented: `scooter`, `cellular`, `updates`, `dashboard`, `alarm`, `engine-ecu`, `keycard`, `pm`, and `trip`. Values are converted to Redis strings. Consult [`settings.schema.json`](settings.schema.json) for supported keys, defaults, types, ranges, and transient markers. The service enforces enum membership (`values`) and declared formats (`trip.expunge`'s `trip-expunge` format) during TOML hydration and on live Redis updates; an invalid value is repaired to the last persisted valid value, or to the schema default (and `never` for `trip.expunge`) when none exists. Declared types and numeric bounds are checked but logged only (`log-only`), so a type or range violation never alters the stored value.
 
+`user-visible` in the schema is a presentation hint, not an access control list. A `user-visible: false` key is fully supported and settable; it is hidden from a client's basic view but is what advanced editors surface behind their advanced toggle - lsd's "Show advanced", Sunshine's advanced tier - and `lsc settings list` prints every key regardless. On the dashboard, `scootui-qt` builds fields only for the keys it explicitly maps (`// @schema <key>` annotations in `SettingsStore.h`), so `user-visible: true` additionally commits the dashboard to carrying a control for that key.
+
 ### Service-mode overlay
 
 Commands are consumed from Redis list `settings:overlay` with `BRPOP`:

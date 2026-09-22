@@ -504,6 +504,44 @@
     },
     "example": true
   },
+  "scooter.aux-battery.charging-system-warning": {
+    "type": "enum",
+    "description": "Control the dashboard's AUX charging-system warning. Suppress withholds the notification, the charging-condition telltale and the status-bar AUX warning icon. The warning fires when the main pack is active, the AUX charger reports not-charging and AUX voltage is below the charger's charging ceiling.",
+    "label": "AUX Charging-System Warning",
+    "user-visible": false,
+    "service": "scootui-qt",
+    "default": "show",
+    "values": [
+      {
+        "value": "show",
+        "label": "Show"
+      },
+      {
+        "value": "suppress",
+        "label": "Suppress"
+      }
+    ],
+    "example": "show"
+  },
+  "scooter.cb-battery.charging-system-warning": {
+    "type": "enum",
+    "description": "Control the dashboard's connectivity-box charging-system warning. Suppress withholds the notification and the status-bar CB warning icon. The warning fires when the main pack is active, the CBB is present and below 50% charge, and its charger reports not-charging.",
+    "label": "CB Charging-System Warning",
+    "user-visible": false,
+    "service": "scootui-qt",
+    "default": "show",
+    "values": [
+      {
+        "value": "show",
+        "label": "Show"
+      },
+      {
+        "value": "suppress",
+        "label": "Suppress"
+      }
+    ],
+    "example": "show"
+  },
   "dashboard.theme": {
     "type": "enum",
     "description": "Choose the dashboard color theme.",
