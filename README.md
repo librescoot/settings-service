@@ -84,6 +84,12 @@ make lint        # requires golangci-lint
 
 `make fmt`, `make deps`, and `make clean` are also available.
 
+`test/e2e-destination.sh` runs a cross-process check of the destination API: a
+real settings-service and a real `lsc` against a throwaway redis (port 6399),
+covering allocation, UUID lifecycle, deletion, item pruning, boot healing, and
+TOML persistence. It builds both binaries itself; set `LSC_SRC` when the `lsc`
+checkout is not a sibling directory.
+
 ## Deployment and runtime dependencies
 
 The Yocto recipe installs the binary at `/usr/bin/settings-service`, the schema at `/usr/share/settings-service/settings.schema.json`, and systemd unit `librescoot-settings.service`. The unit requires `valkey.service`, requires `/data` to be mounted, wants `NetworkManager.service`, and runs as root.
