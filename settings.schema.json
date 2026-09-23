@@ -1400,6 +1400,14 @@
     "service": "scootui",
     "example": true
   },
+  "dashboard.route-plan.keep-current-stop": {
+    "type": "bool",
+    "description": "Keep guiding to the current stop instead of auto-advancing while riding.",
+    "label": "Keep Current Route Stop",
+    "user-visible": false,
+    "service": "scootui",
+    "example": false
+  },
   "dashboard.route-plan.updated-at": {
     "type": "string",
     "description": "Store the ISO 8601 timestamp of the last change to the active route plan.",
