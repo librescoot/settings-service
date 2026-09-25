@@ -85,6 +85,62 @@ func TestSerializedAppendsAndStaleProgress(t *testing.T) {
 		t.Fatalf("projection %q: %v", projected, err)
 	}
 }
+func TestMoveJumpAndUnreachGuardedByOwner(t *testing.T) {
+	mr := miniredis.RunT(t)
+	ipc := client(t, mr.Addr())
+	s := NewServer(ipc, filepath.Join(t.TempDir(), "plan.json"))
+	if err := s.Load(nil); err != nil {
+		t.Fatal(err)
+	}
+	s.Start()
+	defer s.Stop()
+	original := rpc[ReplaceRequest, Plan](t, ipc, "plan.replace", ReplaceRequest{Stops: []StopInput{{52, 13, "First"}, {53, 14, "Second"}, {54, 15, "Third"}}})
+	invalidStep := 3
+	if _, err := redis_ipc.CallMethod[ReplaceRequest, Plan](ipc, Channel, "plan.replace", ReplaceRequest{Stops: []StopInput{{52, 13, "First"}}, StartStep: &invalidStep}, time.Second); err == nil {
+		t.Fatal("out-of-range start_step accepted")
+	}
+	if current := rpc[Empty, Plan](t, ipc, "plan.get", Empty{}); current.ID != original.ID {
+		t.Fatal("invalid replacement changed the plan")
+	}
+	reached := rpc[ProgressRequest, Plan](t, ipc, "plan.reached", ProgressRequest{original.ID, original.Stops[0].ID})
+	moved := rpc[MoveRequest, Plan](t, ipc, "plan.move", MoveRequest{FromIndex: 0, ToIndex: 2, ExpectedRevision: reached.Revision})
+	if moved.CurrentStep != 2 || moved.Stops[2].ID != original.Stops[0].ID || !moved.Stops[2].Reached || mr.HGet("navigation", "destination") != "52.000000,13.000000" {
+		t.Fatalf("move changed current stop: %+v", moved)
+	}
+	if _, err := redis_ipc.CallMethod[JumpRequest, Plan](ipc, Channel, "plan.jump", JumpRequest{Index: 1, ExpectedRevision: reached.Revision}, time.Second); err == nil {
+		t.Fatal("stale jump succeeded")
+	}
+	jumped := rpc[JumpRequest, Plan](t, ipc, "plan.jump", JumpRequest{Index: 1, ExpectedRevision: moved.Revision})
+	if jumped.Stops[0].ID != moved.Stops[0].ID || !jumped.Stops[0].Reached || jumped.Stops[1].Reached || jumped.Stops[2].Reached {
+		t.Fatalf("jump changed IDs or reached flags: %+v", jumped)
+	}
+	current := ProgressRequest{jumped.ID, jumped.Stops[1].ID}
+	marked := rpc[ProgressRequest, Plan](t, ipc, "plan.reached", current)
+	undone := rpc[ProgressRequest, Plan](t, ipc, "plan.unreach", current)
+	if undone.Stops[1].Reached || undone.Revision != marked.Revision+1 {
+		t.Fatalf("unreach did not undo arrival: %+v", undone)
+	}
+	if _, err := redis_ipc.CallMethod[ProgressRequest, Plan](ipc, Channel, "plan.unreach", ProgressRequest{jumped.ID, jumped.Stops[0].ID}, time.Second); err == nil {
+		t.Fatal("stale unreach succeeded")
+	}
+}
+
+func TestReplaceSelectsStartStepAtomically(t *testing.T) {
+	mr := miniredis.RunT(t)
+	ipc := client(t, mr.Addr())
+	s := NewServer(ipc, filepath.Join(t.TempDir(), "plan.json"))
+	if err := s.Load(nil); err != nil {
+		t.Fatal(err)
+	}
+	s.Start()
+	defer s.Stop()
+	start := 1
+	plan := rpc[ReplaceRequest, Plan](t, ipc, "plan.replace", ReplaceRequest{Stops: []StopInput{{52, 13, "First"}, {53, 14, "Second"}}, StartStep: &start})
+	if plan.CurrentStep != 1 || !plan.Stops[0].Reached || plan.Stops[1].Reached || mr.HGet("navigation", "destination") != "53.000000,14.000000" {
+		t.Fatalf("replacement not atomic: %+v", plan)
+	}
+}
+
 func TestReachedAdvanceAndDurableClear(t *testing.T) {
 	mr := miniredis.RunT(t)
 	ipc := client(t, mr.Addr())

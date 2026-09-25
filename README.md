@@ -43,9 +43,12 @@ must be handled by every caller). The JSON request/response contract is:
 | Method | Request JSON | Response |
 |---|---|---|
 | `plan.get` | `{}` | plan |
-| `plan.replace` | `{"stops":[{"lat":52.5,"lon":13.4,"label":"Home"}]}` | plan |
+| `plan.replace` | `{"stops":[{"lat":52.5,"lon":13.4,"label":"Home"}],"start_step":0}` (`start_step` optional) | plan |
 | `plan.append` | `{"stop":{"lat":52.5,"lon":13.4,"label":"Home"}}` | plan |
 | `plan.remove` | `{"index":0,"expected_revision":3}` | plan |
+| `plan.move` | `{"from_index":0,"to_index":1,"expected_revision":3}` | plan |
+| `plan.jump` | `{"index":1,"expected_revision":3}` | plan |
+| `plan.unreach` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid"}` | plan |
 | `plan.reached` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid"}` | plan |
 | `plan.advance` | same as `plan.reached` | plan |
 | `plan.clear` | `{}` or `{"expected_plan_id":"uuid"}` | plan |
@@ -56,8 +59,11 @@ Indices and `current_step` are zero-based. IDs are opaque UUIDs. Revisions
 increase on each committed mutation, including clear; `plan.reached` on an
 already reached current stop is idempotent. `plan.advance` requires a next stop
 and may skip an unreached stop; the previous stop's `reached` flag is unchanged.
-Replace requires 1–32
-stops; append accepts one stop, creating a new plan if empty. Latitude must be
+Replace requires 1–32 stops and atomically selects `start_step` (default 0),
+marking earlier stops reached. Append accepts one stop, creating a new plan if
+empty. Move preserves stop IDs and the current target; jump selects a stop and
+sets reached flags for earlier stops. Unreach clears the current stop's reached
+flag. Move and jump require an exact revision. Latitude must be
 finite and within [-90,90], longitude within [-180,180]. Remove requires an
 exact revision; progress and optional guarded clear require matching IDs.
 Invalid or stale requests return RPC errors without changing the plan. A

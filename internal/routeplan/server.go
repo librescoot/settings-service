@@ -34,7 +34,8 @@ type Plan struct {
 }
 type Empty struct{}
 type ReplaceRequest struct {
-	Stops []StopInput `json:"stops"`
+	Stops     []StopInput `json:"stops"`
+	StartStep *int        `json:"start_step,omitempty"`
 }
 type StopInput struct {
 	Lat   float64 `json:"lat"`
@@ -79,6 +80,15 @@ type RemoveRequest struct {
 	Index            int    `json:"index"`
 	ExpectedRevision uint64 `json:"expected_revision"`
 }
+type MoveRequest struct {
+	FromIndex        int    `json:"from_index"`
+	ToIndex          int    `json:"to_index"`
+	ExpectedRevision uint64 `json:"expected_revision"`
+}
+type JumpRequest struct {
+	Index            int    `json:"index"`
+	ExpectedRevision uint64 `json:"expected_revision"`
+}
 type ProgressRequest struct {
 	ExpectedPlanID string `json:"expected_plan_id"`
 	ExpectedStopID string `json:"expected_stop_id"`
@@ -101,6 +111,9 @@ func NewServer(ipc *redis_ipc.Client, path string) *Server {
 	redis_ipc.RegisterCall[ReplaceRequest, Plan](cs, "plan.replace", s.replace)
 	redis_ipc.RegisterCall[AppendRequest, Plan](cs, "plan.append", s.append)
 	redis_ipc.RegisterCall[RemoveRequest, Plan](cs, "plan.remove", s.remove)
+	redis_ipc.RegisterCall[MoveRequest, Plan](cs, "plan.move", s.move)
+	redis_ipc.RegisterCall[JumpRequest, Plan](cs, "plan.jump", s.jump)
+	redis_ipc.RegisterCall[ProgressRequest, Plan](cs, "plan.unreach", s.unreach)
 	redis_ipc.RegisterCall[ProgressRequest, Plan](cs, "plan.reached", s.reached)
 	redis_ipc.RegisterCall[ProgressRequest, Plan](cs, "plan.advance", s.advance)
 	redis_ipc.RegisterCall[ClearRequest, Plan](cs, "plan.clear", s.clear)
@@ -227,16 +240,24 @@ func (s *Server) replace(req ReplaceRequest) (Plan, error) {
 	if len(req.Stops) == 0 || len(req.Stops) > 32 {
 		return Plan{}, errors.New("stops must contain 1 to 32 entries")
 	}
+	step := 0
+	if req.StartStep != nil {
+		step = *req.StartStep
+	}
+	if step < 0 || step >= len(req.Stops) {
+		return Plan{}, errors.New("invalid start_step")
+	}
 	id, err := destination.NewUUID()
 	if err != nil {
 		return Plan{}, err
 	}
-	p := Plan{ID: id, Stops: make([]Stop, 0, len(req.Stops))}
-	for _, input := range req.Stops {
+	p := Plan{ID: id, Stops: make([]Stop, 0, len(req.Stops)), CurrentStep: step}
+	for i, input := range req.Stops {
 		stop, err := newStop(input)
 		if err != nil {
 			return Plan{}, err
 		}
+		stop.Reached = i < step
 		p.Stops = append(p.Stops, stop)
 	}
 	return s.commit(p)
@@ -278,11 +299,66 @@ func (s *Server) remove(req RemoveRequest) (Plan, error) {
 	}
 	return s.commit(p)
 }
+func (s *Server) move(req MoveRequest) (Plan, error) {
+	if req.ExpectedRevision != s.plan.Revision {
+		return Plan{}, errors.New("stale revision")
+	}
+	if req.FromIndex < 0 || req.FromIndex >= len(s.plan.Stops) || req.ToIndex < 0 || req.ToIndex >= len(s.plan.Stops) {
+		return Plan{}, errors.New("invalid stop index")
+	}
+	if req.FromIndex == req.ToIndex {
+		return s.plan, nil
+	}
+	p := s.plan
+	p.Stops = append([]Stop{}, p.Stops...)
+	currentID := p.Stops[p.CurrentStep].ID
+	moved := p.Stops[req.FromIndex]
+	if req.FromIndex < req.ToIndex {
+		copy(p.Stops[req.FromIndex:req.ToIndex], p.Stops[req.FromIndex+1:req.ToIndex+1])
+	} else {
+		copy(p.Stops[req.ToIndex+1:req.FromIndex+1], p.Stops[req.ToIndex:req.FromIndex])
+	}
+	p.Stops[req.ToIndex] = moved
+	for i, stop := range p.Stops {
+		if stop.ID == currentID {
+			p.CurrentStep = i
+			break
+		}
+	}
+	return s.commit(p)
+}
+func (s *Server) jump(req JumpRequest) (Plan, error) {
+	if req.ExpectedRevision != s.plan.Revision {
+		return Plan{}, errors.New("stale revision")
+	}
+	if req.Index < 0 || req.Index >= len(s.plan.Stops) {
+		return Plan{}, errors.New("invalid stop index")
+	}
+	p := s.plan
+	p.Stops = append([]Stop{}, p.Stops...)
+	p.CurrentStep = req.Index
+	for i := range p.Stops {
+		p.Stops[i].Reached = i < req.Index
+	}
+	return s.commit(p)
+}
 func (s *Server) checkProgress(req ProgressRequest) error {
 	if req.ExpectedPlanID == "" || req.ExpectedPlanID != s.plan.ID || len(s.plan.Stops) == 0 || req.ExpectedStopID == "" || req.ExpectedStopID != s.plan.Stops[s.plan.CurrentStep].ID {
 		return errors.New("stale plan or stop")
 	}
 	return nil
+}
+func (s *Server) unreach(req ProgressRequest) (Plan, error) {
+	if err := s.checkProgress(req); err != nil {
+		return Plan{}, err
+	}
+	if !s.plan.Stops[s.plan.CurrentStep].Reached {
+		return s.plan, nil
+	}
+	p := s.plan
+	p.Stops = append([]Stop{}, p.Stops...)
+	p.Stops[p.CurrentStep].Reached = false
+	return s.commit(p)
 }
 func (s *Server) reached(req ProgressRequest) (Plan, error) {
 	if err := s.checkProgress(req); err != nil {
