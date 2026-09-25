@@ -34,6 +34,47 @@ Only these TOML top-level sections are represented: `scooter`, `cellular`, `upda
 
 `user-visible` in the schema is a presentation hint, not an access control list. A `user-visible: false` key is fully supported and settable; it is hidden from a client's basic view but is what advanced editors surface behind their advanced toggle - lsd's "Show advanced", Sunshine's advanced tier - and `lsc settings list` prints every key regardless. On the dashboard, `scootui-qt` builds fields only for the keys it explicitly maps (`// @schema <key>` annotations in `SettingsStore.h`), so `user-visible: true` additionally commits the dashboard to carrying a control for that key.
 
+### Route-plan RPC
+
+The MDB settings-service is the sole owner of the navigation plan. Call redis-ipc
+`CallMethod` on `settings:route-plan` (one serialized handler, timeout and errors
+must be handled by every caller). The JSON request/response contract is:
+
+| Method | Request JSON | Response |
+|---|---|---|
+| `plan.get` | `{}` | plan |
+| `plan.replace` | `{"stops":[{"lat":52.5,"lon":13.4,"label":"Home"}]}` | plan |
+| `plan.append` | `{"stop":{"lat":52.5,"lon":13.4,"label":"Home"}}` | plan |
+| `plan.remove` | `{"index":0,"expected_revision":3}` | plan |
+| `plan.reached` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid"}` | plan |
+| `plan.advance` | same as `plan.reached` | plan |
+| `plan.clear` | `{}` or `{"expected_plan_id":"uuid"}` | plan |
+
+A plan is `{"id":"uuid","revision":3,"stops":[{"id":"uuid","lat":52.5,"lon":13.4,"label":"Home","reached":false}],"current_step":0}`.
+An empty plan has `id:""`, `stops:[]`, and `current_step:0`.
+Indices and `current_step` are zero-based. IDs are opaque UUIDs. Revisions
+increase on each committed mutation, including clear; `plan.reached` on an
+already reached current stop is idempotent. `plan.advance` requires that the
+current stop has been reached and a next stop exists. Replace requires 1–32
+stops; append accepts one stop, creating a new plan if empty. Latitude must be
+finite and within [-90,90], longitude within [-180,180]. Remove requires an
+exact revision; progress and optional guarded clear require matching IDs.
+Invalid or stale requests return RPC errors without changing the plan. A
+missing service is an RPC error, not permission to write Redis directly.
+
+The entire snapshot is synced to `settings-route-plan.json` beside the configured
+settings TOML before a successful reply or Redis publication. On startup it is
+re-published even when empty. If no snapshot exists, active legacy
+`dashboard.route-plan.*` settings are imported, otherwise legacy navigation
+`waypoints` or a single `latitude`/`longitude` destination is imported (an
+explicit inactive legacy plan is treated as cleared even if Redis still has a destination). If legacy sources disagree and freshness cannot be established, the inactive setting wins; clients must re-send an ambiguous pre-upgrade destination. Migration runs only once.
+The owner atomically updates hash `navigation` with JSON `plan`, decimal
+`revision`, compatibility `waypoints` (JSON array of lat/lon/label),
+`current-step`, `destination`, `latitude`, `longitude`, `address`, and
+`timestamp`; it then publishes the field names and `updated` on channel
+`navigation`. Cleared compatibility fields are empty strings. Clients must
+read `navigation[plan]` as a complete snapshot rather than combine notifications.
+
 ### Service-mode overlay
 
 Commands are consumed from Redis list `settings:overlay` with `BRPOP`:
@@ -49,7 +90,7 @@ redis-cli LPUSH settings:overlay clear:service
 
 ```text
 settings-service [--version]
-  --settings-file PATH          defaults to /data/settings.toml
+  --settings-file PATH          defaults to /data/settings.toml (route snapshot alongside it)
   --wireguard-config-dir PATH   defaults to /data/wireguard
   --schema PATH                 defaults to /usr/share/settings-service/settings.schema.json
 ```

@@ -14,6 +14,7 @@ import (
 	"github.com/librescoot/settings-service/internal/journalupload"
 	"github.com/librescoot/settings-service/internal/network"
 	"github.com/librescoot/settings-service/internal/redis"
+	"github.com/librescoot/settings-service/internal/routeplan"
 	"github.com/librescoot/settings-service/internal/schema"
 )
 
@@ -28,6 +29,7 @@ type SettingsService struct {
 	// callers writing fields directly.
 	ipcClient  *redis_ipc.Client
 	destServer *destination.Server
+	planServer *routeplan.Server
 
 	// Only TOML-loaded and runtime user edits persist; schema defaults remain in Redis.
 	userSetKeys map[string]struct{}
@@ -78,11 +80,13 @@ func New(redisAddr, schemaPath string) (*SettingsService, error) {
 	}
 	destServer := destination.NewServer(ipcClient)
 	destServer.Start()
+	planServer := routeplan.NewServer(ipcClient, strings.TrimSuffix(config.TomlFilePath, ".toml")+"-route-plan.json")
 
 	return &SettingsService{
 		redisClient:                   redisClient,
 		ipcClient:                     ipcClient,
 		destServer:                    destServer,
+		planServer:                    planServer,
 		schema:                        s,
 		ctx:                           ctx,
 		cancel:                        cancel,
@@ -158,6 +162,10 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 	if err := s.redisClient.ReplaceSettings(fields); err != nil {
 		return fmt.Errorf("failed to write settings to Redis: %w", err)
 	}
+	if err := s.planServer.Load(fields); err != nil {
+		return fmt.Errorf("load route plan: %w", err)
+	}
+	s.planServer.Start()
 
 	// Redis survives a settings-service restart, so remove transient keys not
 	// freshly hydrated from a schema default.
@@ -526,6 +534,9 @@ func (s *SettingsService) updateLogServerFromRedis() {
 }
 
 func (s *SettingsService) Close() {
+	if s.planServer != nil {
+		s.planServer.Stop()
+	}
 	if s.destServer != nil {
 		s.destServer.Stop()
 	}
