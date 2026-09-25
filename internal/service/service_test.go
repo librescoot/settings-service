@@ -355,6 +355,64 @@ func TestWatchSettingsPersistsTripSettings(t *testing.T) {
 	}
 }
 
+func TestLoadSettingsFromTOMLMigratesMilestones(t *testing.T) {
+	server := miniredis.RunT(t)
+	originalPath := config.TomlFilePath
+	config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+	t.Cleanup(func() { config.TomlFilePath = originalPath })
+	if err := os.WriteFile(config.TomlFilePath,
+		[]byte("[dashboard]\nmilestone-celebrations = true\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	server.HSet(redis.SettingsKey, "dashboard.milestone-celebrations", "true")
+	svc, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(svc.Close)
+	for range 2 {
+		if err := svc.LoadSettingsFromTOML(); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := config.LoadFromFile()
+		if err != nil {
+			t.Fatal(err)
+		}
+		fields := cfg.ToRedisFields()
+		if _, ok := fields["dashboard.milestone-celebrations"]; ok {
+			t.Fatal("legacy setting still persisted")
+		}
+		for key, want := range map[string]string{
+			"dashboard.milestones.mode":                "regular",
+			"dashboard.milestones.legacy-eggs-pending": "true",
+		} {
+			got, exists, err := svc.redisClient.GetSettingField(key)
+			if err != nil || !exists || got != want {
+				t.Errorf("%s = %q, exists=%v, err=%v; want %q", key, got, exists, err, want)
+			}
+		}
+		if _, exists, err := svc.redisClient.GetSettingField("dashboard.milestone-celebrations"); err != nil || exists {
+			t.Fatalf("legacy Redis setting remains: exists=%v, err=%v", exists, err)
+		}
+	}
+	go svc.WatchSettings()
+	waitForSettingsSubscription(t, server)
+	server.HSet(redis.SettingsKey, "dashboard.milestones.mode", "all")
+	server.Publish(redis.SettingsChannel, "dashboard.milestones.mode")
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		cfg, err := config.LoadFromFile()
+		if err == nil && (cfg.ToRedisFields()["dashboard.milestones.legacy-eggs-pending"] == "false" || cfg.ToRedisFields()["dashboard.milestones.legacy-eggs-pending"] == false) {
+			if cfg.ToRedisFields()["dashboard.milestones.mode"] != "all" {
+				t.Fatalf("mode not persisted with cleared marker: %v", cfg.ToRedisFields())
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("explicit milestone mode did not clear migration marker")
+}
+
 func TestLoadSettingsFromTOMLRepairsInvalidTripExpunge(t *testing.T) {
 	server := miniredis.RunT(t)
 	originalTomlPath := config.TomlFilePath

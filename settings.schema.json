@@ -779,14 +779,42 @@
     ],
     "example": "overlay"
   },
-  "dashboard.milestone-celebrations": {
-    "type": "bool",
-    "description": "Celebrate odometer milestones and special numbers with confetti and a banner after parking.",
-    "label": "Milestone Celebrations",
+  "dashboard.milestones.mode": {
+    "type": "enum",
+    "description": "Choose which odometer milestones trigger a notice and optional parked celebration.",
+    "label": "Milestones",
     "user-visible": true,
     "service": "scootui",
+    "default": "off",
+    "values": [
+      { "value": "off", "label": "Off", "description": "No milestone notices or celebrations." },
+      { "value": "regular", "label": "Regular", "description": "10 km and every 100 km thereafter." },
+      { "value": "all", "label": "Regular + Easter Eggs", "description": "Regular milestones and one-shot special numbers." }
+    ],
+    "example": "all"
+  },
+  "dashboard.milestones.presentation": {
+    "type": "enum",
+    "description": "Choose how enabled milestones are displayed.",
+    "label": "Milestone Presentation",
+    "user-visible": true,
+    "service": "scootui",
+    "default": "banner-and-confetti",
+    "values": [
+      { "value": "notice", "label": "Small Notice", "description": "Show only the brief in-ride notice." },
+      { "value": "banner", "label": "Banner", "description": "Show the notice and a ticket after parking." },
+      { "value": "banner-and-confetti", "label": "Banner + Confetti", "description": "Show the notice, parked ticket, and confetti." }
+    ],
+    "example": "banner"
+  },
+  "dashboard.milestones.legacy-eggs-pending": {
+    "type": "bool",
+    "description": "Internal handoff for importing the dashboard's saved easter-egg preference.",
+    "label": "Milestone Migration Pending",
+    "user-visible": false,
+    "service": "scootui",
     "default": false,
-    "example": true
+    "example": false
   },
   "dashboard.hop-on-combo": {
     "type": "string",

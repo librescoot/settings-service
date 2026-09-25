@@ -128,6 +128,15 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 		log.Printf("No %s found, using schema defaults only", config.TomlFilePath)
 	} else {
+		migrated, migrateErr := migrateMilestoneSettings(cfg)
+		if migrateErr != nil {
+			return migrateErr
+		}
+		if migrated {
+			if err := config.SaveToFile(cfg); err != nil {
+				return fmt.Errorf("save milestone settings migration: %w", err)
+			}
+		}
 		droppedTransient, invalid = applyTomlOverlay(cfg.ToRedisFields(), s.schema, fields, userSet)
 	}
 	for key, invalidValue := range invalid {
@@ -161,6 +170,9 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 
 	if err := s.redisClient.ReplaceSettings(fields); err != nil {
 		return fmt.Errorf("failed to write settings to Redis: %w", err)
+	}
+	if err := s.redisClient.DeleteSettingsFields([]string{"dashboard.milestone-celebrations"}); err != nil {
+		return fmt.Errorf("remove legacy milestone setting from Redis: %w", err)
 	}
 	if err := s.planServer.Load(fields); err != nil {
 		return fmt.Errorf("load route plan: %w", err)
@@ -412,6 +424,16 @@ func (s *SettingsService) WatchSettings() {
 				}
 				if s.schema.HasValidation(msg.Payload) && !s.reconcileValidatedSetting(msg.Payload) {
 					continue
+				}
+				if msg.Payload == "dashboard.milestones.mode" {
+					pending, exists, err := s.redisClient.GetSettingField("dashboard.milestones.legacy-eggs-pending")
+					if err == nil && exists && pending == "true" {
+						if err := s.redisClient.SetSettingField("dashboard.milestones.legacy-eggs-pending", "false"); err != nil {
+							log.Printf("Error clearing milestone migration marker: %v", err)
+						} else {
+							s.markUserSet("dashboard.milestones.legacy-eggs-pending")
+						}
+					}
 				}
 				s.logTypedViolation(msg.Payload)
 
