@@ -54,8 +54,9 @@ A plan is `{"id":"uuid","revision":3,"stops":[{"id":"uuid","lat":52.5,"lon":13.4
 An empty plan has `id:""`, `stops:[]`, and `current_step:0`.
 Indices and `current_step` are zero-based. IDs are opaque UUIDs. Revisions
 increase on each committed mutation, including clear; `plan.reached` on an
-already reached current stop is idempotent. `plan.advance` requires that the
-current stop has been reached and a next stop exists. Replace requires 1–32
+already reached current stop is idempotent. `plan.advance` requires a next stop
+and may skip an unreached stop; the previous stop's `reached` flag is unchanged.
+Replace requires 1–32
 stops; append accepts one stop, creating a new plan if empty. Latitude must be
 finite and within [-90,90], longitude within [-180,180]. Remove requires an
 exact revision; progress and optional guarded clear require matching IDs.
@@ -64,10 +65,11 @@ missing service is an RPC error, not permission to write Redis directly.
 
 The entire snapshot is synced to `settings-route-plan.json` beside the configured
 settings TOML before a successful reply or Redis publication. On startup it is
-re-published even when empty. If no snapshot exists, active legacy
-`dashboard.route-plan.*` settings are imported, otherwise legacy navigation
-`waypoints` or a single `latitude`/`longitude` destination is imported (an
-explicit inactive legacy plan is treated as cleared even if Redis still has a destination). If legacy sources disagree and freshness cannot be established, the inactive setting wins; clients must re-send an ambiguous pre-upgrade destination. Migration runs only once.
+re-published even when empty. If no snapshot exists, an active legacy
+`dashboard.route-plan.*` plan is imported. A `navigation` hash target without
+an active persisted plan is not imported: it may be a completed trip or an
+unconfirmed destination, and freshness cannot be established. Clients must
+re-send such a destination. Migration runs only once.
 The owner atomically updates hash `navigation` with JSON `plan`, decimal
 `revision`, compatibility `waypoints` (JSON array of lat/lon/label),
 `current-step`, `destination`, `latitude`, `longitude`, `address`, and

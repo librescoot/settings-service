@@ -89,24 +89,23 @@ func TestReachedAdvanceAndDurableClear(t *testing.T) {
 	mr := miniredis.RunT(t)
 	ipc := client(t, mr.Addr())
 	path := filepath.Join(t.TempDir(), "plan.json")
-	mr.HSet("navigation", "waypoints", `[{"lat":50,"lon":10,"label":"legacy"}]`)
 	s := NewServer(ipc, path)
 	if err := s.Load(nil); err != nil {
 		t.Fatal(err)
 	}
 	s.Start()
-	migrated := rpc[Empty, Plan](t, ipc, "plan.get", Empty{})
-	if len(migrated.Stops) != 1 {
-		t.Fatalf("migration: %+v", migrated)
+	first := rpc[AppendRequest, Plan](t, ipc, "plan.append", AppendRequest{Stop: StopInput{50, 10, "First"}})
+	if len(first.Stops) != 1 {
+		t.Fatalf("first stop: %+v", first)
 	}
 	plan := rpc[AppendRequest, Plan](t, ipc, "plan.append", AppendRequest{Stop: StopInput{52, 13, "Next"}})
-	reached := rpc[ProgressRequest, Plan](t, ipc, "plan.reached", ProgressRequest{plan.ID, plan.Stops[0].ID})
-	if !reached.Stops[0].Reached {
-		t.Fatal("reach not recorded")
-	}
 	advanced := rpc[ProgressRequest, Plan](t, ipc, "plan.advance", ProgressRequest{plan.ID, plan.Stops[0].ID})
-	if advanced.CurrentStep != 1 || mr.HGet("navigation", "destination") != "52.000000,13.000000" {
-		t.Fatalf("advance projection: %+v", advanced)
+	if advanced.CurrentStep != 1 || advanced.Stops[0].Reached || mr.HGet("navigation", "destination") != "52.000000,13.000000" {
+		t.Fatalf("skip projection: %+v", advanced)
+	}
+	reached := rpc[ProgressRequest, Plan](t, ipc, "plan.reached", ProgressRequest{plan.ID, plan.Stops[1].ID})
+	if !reached.Stops[1].Reached {
+		t.Fatal("reach not recorded")
 	}
 	s.Stop()
 	mr.FlushAll() // Redis state is volatile; the disk snapshot is authoritative.
@@ -116,7 +115,7 @@ func TestReachedAdvanceAndDurableClear(t *testing.T) {
 	}
 	restart.Start()
 	restored := rpc[Empty, Plan](t, ipc, "plan.get", Empty{})
-	if restored.CurrentStep != 1 || restored.Revision != advanced.Revision {
+	if restored.CurrentStep != 1 || restored.Revision != reached.Revision {
 		t.Fatalf("restore: %+v", restored)
 	}
 	cleared := rpc[ClearRequest, Plan](t, ipc, "plan.clear", ClearRequest{ExpectedPlanID: restored.ID})
@@ -171,6 +170,22 @@ func TestActiveLegacySettingsMigration(t *testing.T) {
 	var disk Plan
 	if err := json.Unmarshal(data, &disk); err != nil || disk.ID != p.ID {
 		t.Fatalf("disk snapshot: %+v %v", disk, err)
+	}
+}
+
+func TestLegacyNavigationWithoutActiveSettingsIsNotImported(t *testing.T) {
+	mr := miniredis.RunT(t)
+	ipc := client(t, mr.Addr())
+	mr.HSet("navigation", "waypoints", `[{"lat":52,"lon":13,"label":"Possibly stale"}]`)
+	s := NewServer(ipc, filepath.Join(t.TempDir(), "plan.json"))
+	if err := s.Load(nil); err != nil {
+		t.Fatal(err)
+	}
+	s.Start()
+	defer s.Stop()
+	plan := rpc[Empty, Plan](t, ipc, "plan.get", Empty{})
+	if len(plan.Stops) != 0 || mr.HGet("navigation", "waypoints") != "" {
+		t.Fatalf("unverified legacy target resurrected: %+v", plan)
 	}
 }
 

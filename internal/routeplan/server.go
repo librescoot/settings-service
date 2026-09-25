@@ -300,8 +300,8 @@ func (s *Server) advance(req ProgressRequest) (Plan, error) {
 	if err := s.checkProgress(req); err != nil {
 		return Plan{}, err
 	}
-	if !s.plan.Stops[s.plan.CurrentStep].Reached || s.plan.CurrentStep+1 >= len(s.plan.Stops) {
-		return Plan{}, errors.New("current stop not reached or no next stop")
+	if s.plan.CurrentStep+1 >= len(s.plan.Stops) {
+		return Plan{}, errors.New("no next stop")
 	}
 	p := s.plan
 	p.CurrentStep++
@@ -343,39 +343,6 @@ func (s *Server) migrate(settings map[string]any) error {
 		}
 		if len(s.plan.Stops) > 0 {
 			step, _ := strconv.Atoi(fmt.Sprint(settings["dashboard.route-plan.current-step"]))
-			if step >= 0 && step < len(s.plan.Stops) {
-				s.plan.CurrentStep = step
-			}
-		}
-	} else if fmt.Sprint(settings["dashboard.route-plan.active"]) == "false" {
-		return nil
-	} else {
-		nav, err := s.ipc.HGetAll("navigation")
-		if err != nil {
-			return err
-		}
-		var inputs []StopInput
-		if nav["waypoints"] != "" {
-			if err := json.Unmarshal([]byte(nav["waypoints"]), &inputs); err != nil {
-				return fmt.Errorf("migrate navigation waypoints: %w", err)
-			}
-		} else if nav["latitude"] != "" && nav["longitude"] != "" {
-			lat, e1 := strconv.ParseFloat(nav["latitude"], 64)
-			lon, e2 := strconv.ParseFloat(nav["longitude"], 64)
-			if e1 != nil || e2 != nil {
-				return errors.New("invalid legacy destination")
-			}
-			inputs = []StopInput{{lat, lon, nav["address"]}}
-		}
-		for _, input := range inputs {
-			stop, err := newStop(input)
-			if err != nil {
-				return err
-			}
-			s.plan.Stops = append(s.plan.Stops, stop)
-		}
-		if len(s.plan.Stops) > 0 {
-			step, _ := strconv.Atoi(nav["current-step"])
 			if step >= 0 && step < len(s.plan.Stops) {
 				s.plan.CurrentStep = step
 			}
