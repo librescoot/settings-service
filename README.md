@@ -49,11 +49,12 @@ must be handled by every caller). The JSON request/response contract is:
 | `plan.move` | `{"from_index":0,"to_index":1,"expected_revision":3}` | plan |
 | `plan.jump` | `{"index":1,"expected_revision":3}` | plan |
 | `plan.unreach` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid"}` | plan |
+| `plan.set-keep-current` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid","keep":false}` | plan |
 | `plan.reached` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid"}` | plan |
 | `plan.advance` | same as `plan.reached` | plan |
 | `plan.clear` | `{}` or `{"expected_plan_id":"uuid"}` | plan |
 
-A plan is `{"id":"uuid","revision":3,"stops":[{"id":"uuid","lat":52.5,"lon":13.4,"label":"Home","reached":false}],"current_step":0}`.
+A plan is `{"id":"uuid","revision":3,"stops":[{"id":"uuid","lat":52.5,"lon":13.4,"label":"Home","reached":false}],"current_step":0,"keep_current_stop":false}`.
 An empty plan has `id:""`, `stops:[]`, and `current_step:0`.
 Indices and `current_step` are zero-based. IDs are opaque UUIDs. Revisions
 increase on each committed mutation, including clear; `plan.reached` on an
@@ -63,7 +64,10 @@ Replace requires 1–32 stops and atomically selects `start_step` (default 0),
 marking earlier stops reached. Append accepts one stop, creating a new plan if
 empty. Move preserves stop IDs and the current target; jump selects a stop and
 sets reached flags for earlier stops. Unreach clears the current stop's reached
-flag. Move and jump require an exact revision. Latitude must be
+flag and enables `keep_current_stop`, suppressing a repeated arrival while the
+rider remains there. `plan.set-keep-current` clears that suppression on dismount;
+the flag survives an owner restart and resets when the current hop changes. Move
+and jump require an exact revision. Latitude must be
 finite and within [-90,90], longitude within [-180,180]. Remove requires an
 exact revision; progress and optional guarded clear require matching IDs.
 Invalid or stale requests return RPC errors without changing the plan. A

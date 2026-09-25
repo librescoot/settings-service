@@ -141,6 +141,48 @@ func TestReplaceSelectsStartStepAtomically(t *testing.T) {
 	}
 }
 
+func TestKeepCurrentStopSurvivesRestartAndClearsOnDeparture(t *testing.T) {
+	mr := miniredis.RunT(t)
+	ipc := client(t, mr.Addr())
+	path := filepath.Join(t.TempDir(), "plan.json")
+	s := NewServer(ipc, path)
+	if err := s.Load(nil); err != nil {
+		t.Fatal(err)
+	}
+	s.Start()
+	plan := rpc[ReplaceRequest, Plan](t, ipc, "plan.replace", ReplaceRequest{Stops: []StopInput{{52, 13, "Here"}, {53, 14, "Next"}}})
+	current := ProgressRequest{plan.ID, plan.Stops[0].ID}
+	_ = rpc[ProgressRequest, Plan](t, ipc, "plan.reached", current)
+	kept := rpc[ProgressRequest, Plan](t, ipc, "plan.unreach", current)
+	if !kept.KeepCurrentStop || kept.Stops[0].Reached {
+		t.Fatalf("unreach did not keep current stop: %+v", kept)
+	}
+	s.Stop()
+	restart := NewServer(ipc, path)
+	if err := restart.Load(nil); err != nil {
+		t.Fatal(err)
+	}
+	restart.Start()
+	defer restart.Stop()
+	restored := rpc[Empty, Plan](t, ipc, "plan.get", Empty{})
+	if !restored.KeepCurrentStop || restored.Revision != kept.Revision {
+		t.Fatalf("restart lost suppression: %+v", restored)
+	}
+	falseValue := false
+	if _, err := redis_ipc.CallMethod[SetKeepRequest, Plan](ipc, Channel, "plan.set-keep-current", SetKeepRequest{ProgressRequest: ProgressRequest{restored.ID, "stale"}, Keep: &falseValue}, time.Second); err == nil {
+		t.Fatal("stale stop cleared suppression")
+	}
+	resumed := rpc[SetKeepRequest, Plan](t, ipc, "plan.set-keep-current", SetKeepRequest{ProgressRequest: current, Keep: &falseValue})
+	if resumed.KeepCurrentStop || resumed.Stops[0].Reached {
+		t.Fatalf("dismount did not clear suppression: %+v", resumed)
+	}
+	_ = rpc[ProgressRequest, Plan](t, ipc, "plan.unreach", current)
+	advanced := rpc[ProgressRequest, Plan](t, ipc, "plan.advance", current)
+	if advanced.KeepCurrentStop || advanced.CurrentStep != 1 {
+		t.Fatalf("departure retained suppression: %+v", advanced)
+	}
+}
+
 func TestReachedAdvanceAndDurableClear(t *testing.T) {
 	mr := miniredis.RunT(t)
 	ipc := client(t, mr.Addr())
@@ -198,14 +240,15 @@ func TestActiveLegacySettingsMigration(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "plan.json")
 	s := NewServer(ipc, path)
 	fields := map[string]any{
-		"dashboard.route-plan.active":       true,
-		"dashboard.route-plan.0.latitude":   52.5,
-		"dashboard.route-plan.0.longitude":  13.4,
-		"dashboard.route-plan.0.label":      "Home",
-		"dashboard.route-plan.0.reached":    true,
-		"dashboard.route-plan.1.latitude":   52.6,
-		"dashboard.route-plan.1.longitude":  13.5,
-		"dashboard.route-plan.current-step": 1,
+		"dashboard.route-plan.active":            true,
+		"dashboard.route-plan.0.latitude":        52.5,
+		"dashboard.route-plan.0.longitude":       13.4,
+		"dashboard.route-plan.0.label":           "Home",
+		"dashboard.route-plan.0.reached":         true,
+		"dashboard.route-plan.1.latitude":        52.6,
+		"dashboard.route-plan.1.longitude":       13.5,
+		"dashboard.route-plan.current-step":      1,
+		"dashboard.route-plan.keep-current-stop": true,
 	}
 	if err := s.Load(fields); err != nil {
 		t.Fatal(err)
@@ -213,7 +256,7 @@ func TestActiveLegacySettingsMigration(t *testing.T) {
 	s.Start()
 	defer s.Stop()
 	p := rpc[Empty, Plan](t, ipc, "plan.get", Empty{})
-	if len(p.Stops) != 2 || !p.Stops[0].Reached || p.CurrentStep != 1 || p.ID == "" {
+	if len(p.Stops) != 2 || !p.Stops[0].Reached || p.CurrentStep != 1 || p.ID == "" || !p.KeepCurrentStop {
 		t.Fatalf("legacy migration: %+v", p)
 	}
 	if mr.HGet("navigation", "address") != "" || mr.HGet("navigation", "destination") != "52.600000,13.500000" {

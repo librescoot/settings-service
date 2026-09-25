@@ -27,10 +27,11 @@ type Stop struct {
 	Reached bool    `json:"reached"`
 }
 type Plan struct {
-	ID          string `json:"id"`
-	Revision    uint64 `json:"revision"`
-	Stops       []Stop `json:"stops"`
-	CurrentStep int    `json:"current_step"`
+	ID              string `json:"id"`
+	Revision        uint64 `json:"revision"`
+	Stops           []Stop `json:"stops"`
+	CurrentStep     int    `json:"current_step"`
+	KeepCurrentStop bool   `json:"keep_current_stop"`
 }
 type Empty struct{}
 type ReplaceRequest struct {
@@ -93,6 +94,10 @@ type ProgressRequest struct {
 	ExpectedPlanID string `json:"expected_plan_id"`
 	ExpectedStopID string `json:"expected_stop_id"`
 }
+type SetKeepRequest struct {
+	ProgressRequest
+	Keep *bool `json:"keep"`
+}
 type ClearRequest struct {
 	ExpectedPlanID string `json:"expected_plan_id,omitempty"`
 }
@@ -114,6 +119,7 @@ func NewServer(ipc *redis_ipc.Client, path string) *Server {
 	redis_ipc.RegisterCall[MoveRequest, Plan](cs, "plan.move", s.move)
 	redis_ipc.RegisterCall[JumpRequest, Plan](cs, "plan.jump", s.jump)
 	redis_ipc.RegisterCall[ProgressRequest, Plan](cs, "plan.unreach", s.unreach)
+	redis_ipc.RegisterCall[SetKeepRequest, Plan](cs, "plan.set-keep-current", s.setKeepCurrent)
 	redis_ipc.RegisterCall[ProgressRequest, Plan](cs, "plan.reached", s.reached)
 	redis_ipc.RegisterCall[ProgressRequest, Plan](cs, "plan.advance", s.advance)
 	redis_ipc.RegisterCall[ClearRequest, Plan](cs, "plan.clear", s.clear)
@@ -161,6 +167,9 @@ func validatePlan(p Plan) error {
 	}
 	if len(p.Stops) > 0 && p.ID == "" {
 		return errors.New("missing plan id")
+	}
+	if p.KeepCurrentStop && (len(p.Stops) == 0 || p.Stops[p.CurrentStep].Reached) {
+		return errors.New("keep_current_stop requires an unreached current stop")
 	}
 	seen := make(map[string]bool)
 	for _, stop := range p.Stops {
@@ -288,6 +297,7 @@ func (s *Server) remove(req RemoveRequest) (Plan, error) {
 		return Plan{}, errors.New("invalid stop index")
 	}
 	p := s.plan
+	currentID := p.Stops[p.CurrentStep].ID
 	p.Stops = append(append([]Stop{}, p.Stops[:req.Index]...), p.Stops[req.Index+1:]...)
 	if len(p.Stops) == 0 {
 		p.ID = ""
@@ -296,6 +306,9 @@ func (s *Server) remove(req RemoveRequest) (Plan, error) {
 		p.CurrentStep = len(p.Stops) - 1
 	} else if req.Index < p.CurrentStep {
 		p.CurrentStep--
+	}
+	if len(p.Stops) == 0 || p.Stops[p.CurrentStep].ID != currentID || p.CurrentStep == len(p.Stops)-1 {
+		p.KeepCurrentStop = false
 	}
 	return s.commit(p)
 }
@@ -325,6 +338,9 @@ func (s *Server) move(req MoveRequest) (Plan, error) {
 			break
 		}
 	}
+	if p.CurrentStep == len(p.Stops)-1 {
+		p.KeepCurrentStop = false
+	}
 	return s.commit(p)
 }
 func (s *Server) jump(req JumpRequest) (Plan, error) {
@@ -337,6 +353,7 @@ func (s *Server) jump(req JumpRequest) (Plan, error) {
 	p := s.plan
 	p.Stops = append([]Stop{}, p.Stops...)
 	p.CurrentStep = req.Index
+	p.KeepCurrentStop = false
 	for i := range p.Stops {
 		p.Stops[i].Reached = i < req.Index
 	}
@@ -352,24 +369,40 @@ func (s *Server) unreach(req ProgressRequest) (Plan, error) {
 	if err := s.checkProgress(req); err != nil {
 		return Plan{}, err
 	}
-	if !s.plan.Stops[s.plan.CurrentStep].Reached {
+	if !s.plan.Stops[s.plan.CurrentStep].Reached && s.plan.KeepCurrentStop {
 		return s.plan, nil
 	}
 	p := s.plan
 	p.Stops = append([]Stop{}, p.Stops...)
 	p.Stops[p.CurrentStep].Reached = false
+	p.KeepCurrentStop = true
+	return s.commit(p)
+}
+func (s *Server) setKeepCurrent(req SetKeepRequest) (Plan, error) {
+	if err := s.checkProgress(req.ProgressRequest); err != nil {
+		return Plan{}, err
+	}
+	if req.Keep == nil || (*req.Keep && s.plan.Stops[s.plan.CurrentStep].Reached) {
+		return Plan{}, errors.New("invalid keep value")
+	}
+	if s.plan.KeepCurrentStop == *req.Keep {
+		return s.plan, nil
+	}
+	p := s.plan
+	p.KeepCurrentStop = *req.Keep
 	return s.commit(p)
 }
 func (s *Server) reached(req ProgressRequest) (Plan, error) {
 	if err := s.checkProgress(req); err != nil {
 		return Plan{}, err
 	}
-	if s.plan.Stops[s.plan.CurrentStep].Reached {
+	if s.plan.Stops[s.plan.CurrentStep].Reached && !s.plan.KeepCurrentStop {
 		return s.plan, nil
 	}
 	p := s.plan
 	p.Stops = append([]Stop{}, p.Stops...)
 	p.Stops[p.CurrentStep].Reached = true
+	p.KeepCurrentStop = false
 	return s.commit(p)
 }
 func (s *Server) advance(req ProgressRequest) (Plan, error) {
@@ -381,6 +414,7 @@ func (s *Server) advance(req ProgressRequest) (Plan, error) {
 	}
 	p := s.plan
 	p.CurrentStep++
+	p.KeepCurrentStop = false
 	return s.commit(p)
 }
 func (s *Server) clear(req ClearRequest) (Plan, error) {
@@ -390,7 +424,7 @@ func (s *Server) clear(req ClearRequest) (Plan, error) {
 	return s.commit(Plan{Stops: []Stop{}})
 }
 func (s *Server) migrate(settings map[string]any) error {
-	// Legacy settings take precedence when marked active; otherwise use the navigation projection.
+	// Only an explicitly active persisted plan has enough evidence to migrate.
 	if fmt.Sprint(settings["dashboard.route-plan.active"]) == "true" {
 		var indices []int
 		for key := range settings {
@@ -422,6 +456,7 @@ func (s *Server) migrate(settings map[string]any) error {
 			if step >= 0 && step < len(s.plan.Stops) {
 				s.plan.CurrentStep = step
 			}
+			s.plan.KeepCurrentStop = fmt.Sprint(settings["dashboard.route-plan.keep-current-stop"]) == "true" && !s.plan.Stops[s.plan.CurrentStep].Reached
 		}
 	}
 	if len(s.plan.Stops) > 32 {
