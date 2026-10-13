@@ -713,6 +713,18 @@
     "default": "#E91E63",
     "example": "#E91E63"
   },
+  "dashboard.speedometer.regen-min-power": {
+    "type": "int",
+    "description": "Set the minimum recuperation power that activates the speedometer track tint. Charging power below this threshold leaves the track neutral. Zero enables the tint for any negative motor current.",
+    "label": "Speedometer Recuperation Minimum Power",
+    "user-visible": false,
+    "service": "scootui",
+    "default": 50,
+    "unit": "W",
+    "min": 0,
+    "max": 10000,
+    "example": 50
+  },
   "dashboard.speedometer.regen-color": {
     "type": "string",
     "description": "Set the speedometer track tint during recuperation. Use #RRGGBB or #AARRGGBB; alpha controls the tint opacity.",
