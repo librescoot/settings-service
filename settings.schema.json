@@ -98,6 +98,15 @@
     "max": 300,
     "example": 60
   },
+  "experimental.battery.dual-pack-admission": {
+    "type": "bool",
+    "description": "Enable experimental dual-pack selection and activation checks using fresh NFC data. Read at battery-service startup; changes require a restart. Reader 1 still requires scooter.dual-battery or --battery1-active.",
+    "label": "Experimental Dual-Pack Admission",
+    "user-visible": false,
+    "service": "battery",
+    "default": false,
+    "example": true
+  },
   "scooter.dual-battery": {
     "type": "bool",
     "description": "Use both installed main batteries when dual-battery hardware is available.",
