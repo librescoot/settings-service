@@ -713,6 +713,51 @@
     "default": "#E91E63",
     "example": "#E91E63"
   },
+  "dashboard.speedometer.regen-color": {
+    "type": "string",
+    "description": "Set the speedometer track tint during recuperation. Use #RRGGBB or #AARRGGBB; alpha controls the tint opacity.",
+    "label": "Speedometer Recuperation Color",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "#4DFF0000",
+    "example": "#4DFF0000"
+  },
+  "dashboard.speedometer.error-color": {
+    "type": "string",
+    "description": "Set the speedometer error arc and pulse colour when ECU telemetry is disconnected. Use #RRGGBB or #AARRGGBB.",
+    "label": "Speedometer Error Color",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "#F44336",
+    "example": "#F44336"
+  },
+  "dashboard.power.regen-color": {
+    "type": "string",
+    "description": "Set the recuperation fill colour in the power bar. Use #RRGGBB or #AARRGGBB.",
+    "label": "Power Bar Recuperation Color",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "#43A047",
+    "example": "#43A047"
+  },
+  "dashboard.power.discharge-color": {
+    "type": "string",
+    "description": "Set the discharge fill colour in the power bar at or below the boost threshold. Use #RRGGBB or #AARRGGBB.",
+    "label": "Power Bar Discharge Color",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "#1E88E5",
+    "example": "#1E88E5"
+  },
+  "dashboard.power.boost-color": {
+    "type": "string",
+    "description": "Set the discharge fill colour in the power bar above the boost threshold. Use #RRGGBB or #AARRGGBB.",
+    "label": "Power Bar Boost Color",
+    "user-visible": false,
+    "service": "scootui",
+    "default": "#FB8C00",
+    "example": "#FB8C00"
+  },
   "dashboard.power-display-mode": {
     "type": "enum",
     "description": "Choose whether the dashboard displays power in kilowatts or current in amps.",
