@@ -855,13 +855,57 @@ func TestShortcutMenuItemsRoundTripThroughService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFromFile() error: %v", err)
 	}
-	section, ok := cfg.Dashboard["shortcut-menu"].(map[string]interface{})
+	dashboard := cfg.Section("dashboard")
+	section, ok := dashboard["shortcut-menu"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("dashboard.shortcut-menu section missing: %#v", cfg.Dashboard)
+		t.Fatalf("dashboard.shortcut-menu section missing: %#v", dashboard)
 	}
 	items, ok := section["items"].([]interface{})
 	if !ok || len(items) != 2 || items[0] != "theme" || items[1] != "view" {
 		t.Fatalf("persisted items = %#v, want ordered array [theme view]", section["items"])
+	}
+}
+
+func TestExperimentalSettingPersistsAcrossServiceRestart(t *testing.T) {
+	server := miniredis.RunT(t)
+	originalTomlPath := config.TomlFilePath
+	config.TomlFilePath = filepath.Join(t.TempDir(), "settings.toml")
+	t.Cleanup(func() { config.TomlFilePath = originalTomlPath })
+
+	svc, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	t.Cleanup(svc.Close)
+
+	const key = "experimental.battery.dual-pack-admission"
+	if err := svc.redisClient.SetSettingField(key, "true"); err != nil {
+		t.Fatalf("SetSettingField() error: %v", err)
+	}
+	svc.markUserSet(key)
+	if err := svc.SaveSettingsToTOML(); err != nil {
+		t.Fatalf("SaveSettingsToTOML() error: %v", err)
+	}
+
+	cfg, err := config.LoadFromFile()
+	if err != nil {
+		t.Fatalf("LoadFromFile() error: %v", err)
+	}
+	if got := cfg.ToRedisFields()[key]; got != "true" {
+		t.Fatalf("persisted setting = %v, want true", got)
+	}
+
+	restarted, err := New(server.Addr(), filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("New() after restart error: %v", err)
+	}
+	t.Cleanup(restarted.Close)
+	if err := restarted.LoadSettingsFromTOML(); err != nil {
+		t.Fatalf("LoadSettingsFromTOML() after restart: %v", err)
+	}
+	got, exists, err := restarted.redisClient.GetSettingField(key)
+	if err != nil || !exists || got != "true" {
+		t.Fatalf("hydrated setting = %q, exists=%v err=%v, want true", got, exists, err)
 	}
 }
 
@@ -929,9 +973,10 @@ func TestLoadSettingsFromTOMLHealsSavedLocationUUIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadFromFile() error: %v", err)
 	}
-	section, ok := cfg.Dashboard["saved-locations"].(map[string]interface{})
+	dashboard := cfg.Section("dashboard")
+	section, ok := dashboard["saved-locations"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("saved-locations section missing: %#v", cfg.Dashboard)
+		t.Fatalf("saved-locations section missing: %#v", dashboard)
 	}
 	record, ok := section["0"].(map[string]interface{})
 	if !ok {

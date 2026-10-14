@@ -14,17 +14,9 @@ import (
 
 var TomlFilePath = "/data/settings.toml"
 
-type Config struct {
-	Scooter   map[string]interface{} `toml:"scooter"`
-	Cellular  map[string]interface{} `toml:"cellular"`
-	Updates   map[string]interface{} `toml:"updates"`
-	Dashboard map[string]interface{} `toml:"dashboard"`
-	Alarm     map[string]interface{} `toml:"alarm"`
-	EngineECU map[string]interface{} `toml:"engine-ecu"`
-	Keycard   map[string]interface{} `toml:"keycard"`
-	PM        map[string]interface{} `toml:"pm"`
-	Trip      map[string]interface{} `toml:"trip"`
-}
+// Config mirrors TOML tables directly. Setting namespaces come from the
+// schema and may grow without changing this persistence layer.
+type Config map[string]interface{}
 
 func LoadFromFile() (*Config, error) {
 	if _, err := os.Stat(TomlFilePath); os.IsNotExist(err) {
@@ -54,6 +46,16 @@ func SaveToFile(config *Config) error {
 	})
 }
 
+// Section returns a top-level TOML table, creating it when needed.
+func (c Config) Section(namespace string) map[string]interface{} {
+	section, ok := c[namespace].(map[string]interface{})
+	if !ok {
+		section = make(map[string]interface{})
+		c[namespace] = section
+	}
+	return section
+}
+
 func setNested(m map[string]interface{}, segments []string, value interface{}) {
 	for i, seg := range segments {
 		if i == len(segments)-1 {
@@ -70,50 +72,15 @@ func setNested(m map[string]interface{}, segments []string, value interface{}) {
 }
 
 func ParseRedisSettings(settings map[string]string, sch *schema.Schema) *Config {
-	config := &Config{
-		Scooter:   make(map[string]interface{}),
-		Cellular:  make(map[string]interface{}),
-		Updates:   make(map[string]interface{}),
-		Dashboard: make(map[string]interface{}),
-		Alarm:     make(map[string]interface{}),
-		EngineECU: make(map[string]interface{}),
-		Keycard:   make(map[string]interface{}),
-		PM:        make(map[string]interface{}),
-		Trip:      make(map[string]interface{}),
-	}
-
+	config := make(Config)
 	for field, value := range settings {
 		segs := strings.Split(field, ".")
-		if len(segs) < 2 {
+		if len(segs) < 2 || segs[0] == "" {
 			continue
 		}
-		var section map[string]interface{}
-		switch segs[0] {
-		case "scooter":
-			section = config.Scooter
-		case "cellular":
-			section = config.Cellular
-		case "updates":
-			section = config.Updates
-		case "dashboard":
-			section = config.Dashboard
-		case "alarm":
-			section = config.Alarm
-		case "engine-ecu":
-			section = config.EngineECU
-		case "keycard":
-			section = config.Keycard
-		case "pm":
-			section = config.PM
-		case "trip":
-			section = config.Trip
-		default:
-			continue
-		}
-		setNested(section, segs[1:], tomlValue(sch, field, value))
+		setNested(config.Section(segs[0]), segs[1:], tomlValue(sch, field, value))
 	}
-
-	return config
+	return &config
 }
 
 // tomlValue converts a Redis string into the TOML-side value. Array-typed
@@ -152,21 +119,12 @@ func redisValue(v interface{}) string {
 
 func (c *Config) ToRedisFields() map[string]interface{} {
 	fields := make(map[string]interface{})
-
-	sections := map[string]map[string]interface{}{
-		"scooter":    c.Scooter,
-		"cellular":   c.Cellular,
-		"updates":    c.Updates,
-		"dashboard":  c.Dashboard,
-		"alarm":      c.Alarm,
-		"engine-ecu": c.EngineECU,
-		"keycard":    c.Keycard,
-		"pm":         c.PM,
-		"trip":       c.Trip,
+	for namespace, rawSection := range *c {
+		section, ok := rawSection.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		flattenSection(namespace, section, fields)
 	}
-	for prefix, section := range sections {
-		flattenSection(prefix, section, fields)
-	}
-
 	return fields
 }

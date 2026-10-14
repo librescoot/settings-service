@@ -270,12 +270,6 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 		log.Printf("  %s = %s", k, v)
 	}
 
-	for field := range settings {
-		if !strings.HasPrefix(field, "scooter.") && !strings.HasPrefix(field, "cellular.") && !strings.HasPrefix(field, "updates.") && !strings.HasPrefix(field, "dashboard.") && !strings.HasPrefix(field, "alarm.") && !strings.HasPrefix(field, "engine-ecu.") && !strings.HasPrefix(field, "keycard.") && !strings.HasPrefix(field, "pm.") && !strings.HasPrefix(field, "trip.") {
-			log.Printf("Warning: Ignoring field '%s' - must be prefixed with 'scooter.', 'cellular.', 'updates.', 'dashboard.', 'alarm.', 'engine-ecu.', 'keycard.', 'pm.', or 'trip.'", field)
-		}
-	}
-
 	cfg := config.ParseRedisSettings(persisted, s.schema)
 	if err := config.SaveToFile(cfg); err != nil {
 		return err

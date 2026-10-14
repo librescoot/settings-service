@@ -19,24 +19,24 @@ func TestMigrateMilestoneSettings(t *testing.T) {
 		{"preserve explicit choice", true, "all", "all", nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := &config.Config{Dashboard: map[string]interface{}{
-				"milestone-celebrations": tc.old,
-			}}
+			cfg := config.Config{}
+			dashboard := cfg.Section("dashboard")
+			dashboard["milestone-celebrations"] = tc.old
 			if tc.newMode != "" {
-				cfg.Dashboard["milestones"] = map[string]interface{}{"mode": tc.newMode}
+				dashboard["milestones"] = map[string]interface{}{"mode": tc.newMode}
 			}
-			changed, err := migrateMilestoneSettings(cfg)
+			changed, err := migrateMilestoneSettings(&cfg)
 			if err != nil || !changed {
 				t.Fatalf("migration = %v, %v", changed, err)
 			}
-			if _, oldPresent := cfg.Dashboard["milestone-celebrations"]; oldPresent {
+			if _, oldPresent := dashboard["milestone-celebrations"]; oldPresent {
 				t.Fatal("legacy setting still present")
 			}
-			nested := cfg.Dashboard["milestones"].(map[string]interface{})
+			nested := dashboard["milestones"].(map[string]interface{})
 			if nested["mode"] != tc.wantMode || nested["legacy-eggs-pending"] != tc.wantMarker {
 				t.Fatalf("milestones = %v", nested)
 			}
-			changed, err = migrateMilestoneSettings(cfg)
+			changed, err = migrateMilestoneSettings(&cfg)
 			if err != nil || changed {
 				t.Fatalf("repeat migration = %v, %v", changed, err)
 			}

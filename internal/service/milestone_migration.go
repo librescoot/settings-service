@@ -10,20 +10,21 @@ import (
 // separate easter-egg file, so it completes that part of the migration after
 // its data partition is mounted.
 func migrateMilestoneSettings(cfg *config.Config) (bool, error) {
-	if cfg.Dashboard == nil {
+	dashboard, ok := (*cfg)["dashboard"].(map[string]interface{})
+	if !ok {
 		return false, nil
 	}
-	old, hasOld := cfg.Dashboard["milestone-celebrations"]
+	old, hasOld := dashboard["milestone-celebrations"]
 	if !hasOld {
 		return false, nil
 	}
-	milestones, ok := cfg.Dashboard["milestones"].(map[string]interface{})
+	milestones, ok := dashboard["milestones"].(map[string]interface{})
 	if !ok {
-		if cfg.Dashboard["milestones"] != nil {
+		if dashboard["milestones"] != nil {
 			return false, fmt.Errorf("dashboard.milestones must be a table")
 		}
 		milestones = make(map[string]interface{})
-		cfg.Dashboard["milestones"] = milestones
+		dashboard["milestones"] = milestones
 	}
 	if _, exists := milestones["mode"]; !exists {
 		mode := "off"
@@ -33,6 +34,6 @@ func migrateMilestoneSettings(cfg *config.Config) (bool, error) {
 		}
 		milestones["mode"] = mode
 	}
-	delete(cfg.Dashboard, "milestone-celebrations")
+	delete(dashboard, "milestone-celebrations")
 	return true, nil
 }

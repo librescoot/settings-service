@@ -39,6 +39,48 @@ func TestTripSettingsTOMLRoundTrip(t *testing.T) {
 
 // Array-typed settings must land in TOML as a native ordered array, not a
 // JSON string, and come back to Redis in the compact JSON wire form.
+func TestArbitrarySchemaNamespaceTOMLRoundTrip(t *testing.T) {
+	sch, err := schema.LoadFile(filepath.Join("..", "..", "settings.schema.json"))
+	if err != nil {
+		t.Fatalf("LoadFile() error: %v", err)
+	}
+
+	const key = "experimental.battery.dual-pack-admission"
+	cfg := ParseRedisSettings(map[string]string{key: "true"}, sch)
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("encoding TOML: %v", err)
+	}
+	if !strings.Contains(string(data), "[experimental.battery]") {
+		t.Fatalf("TOML = %q, want nested experimental.battery table", data)
+	}
+
+	var decoded Config
+	if err := toml.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("decoding TOML: %v", err)
+	}
+	if got := decoded.ToRedisFields()[key]; got != "true" {
+		t.Fatalf("%s = %v, want true", key, got)
+	}
+}
+
+func TestSchemaNamespaceTOMLRoundTripWithoutKnownSection(t *testing.T) {
+	cfg := ParseRedisSettings(map[string]string{
+		"future.namespace.setting": "value",
+	}, nil)
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("encoding TOML: %v", err)
+	}
+	var decoded Config
+	if err := toml.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("decoding TOML: %v", err)
+	}
+	if got := decoded.ToRedisFields()["future.namespace.setting"]; got != "value" {
+		t.Fatalf("future namespace setting = %v, want value", got)
+	}
+}
+
 func TestShortcutMenuItemsTOMLRoundTrip(t *testing.T) {
 	sch, err := schema.LoadFile(filepath.Join("..", "..", "settings.schema.json"))
 	if err != nil {
