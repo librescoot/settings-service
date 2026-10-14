@@ -269,6 +269,14 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	for k, v := range settings {
 		log.Printf("  %s = %s", k, v)
 	}
+	for field := range persisted {
+		prefix, _, _ := strings.Cut(field, ".")
+		switch prefix {
+		case "scooter", "cellular", "updates", "dashboard", "alarm", "engine-ecu", "keycard", "pm", "trip":
+		default:
+			log.Printf("Unknown setting prefix for %q; persisting it anyway", field)
+		}
+	}
 
 	cfg := config.ParseRedisSettings(persisted, s.schema)
 	if err := config.SaveToFile(cfg); err != nil {
