@@ -10,23 +10,31 @@ func TestBatteryAdmissionDefaultsOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const key = "experimental.battery.dual-pack-admission"
-	setting, ok := s.Settings[key]
-	if !ok {
-		t.Fatal("admission setting is missing")
-	}
-	if setting.Type != "bool" || setting.Default != false || setting.UserVisible || setting.ReadOnly {
-		t.Fatalf("unexpected admission setting: %+v", setting)
-	}
-	if got := s.Defaults()[key]; got != "false" {
-		t.Fatalf("default = %q, want false", got)
-	}
-	for _, value := range []string{"true", "false"} {
-		if err := s.ValidateTyped(key, value); err != nil {
-			t.Fatalf("%q: %v", value, err)
-		}
-	}
-	if err := s.ValidateTyped(key, "invalid"); err == nil {
-		t.Fatal("invalid admission setting was accepted")
+	for _, key := range []string{
+		"experimental.battery.dual-pack-admission",
+		"experimental.battery.dual-pack-admission-while-stopped",
+	} {
+		t.Run(key, func(t *testing.T) {
+			setting, ok := s.Settings[key]
+			if !ok {
+				t.Fatal("admission setting is missing")
+			}
+			if setting.Type != "bool" || setting.Default != false || setting.UserVisible || setting.ReadOnly || setting.Transient || len(setting.ChannelDefaults) != 0 {
+				t.Fatalf("unexpected admission setting: %+v", setting)
+			}
+			if got := s.Defaults()[key]; got != "false" {
+				t.Fatalf("default = %q, want false", got)
+			}
+			for _, value := range []string{"true", "false"} {
+				if err := s.ValidateTyped(key, value); err != nil {
+					t.Fatalf("%q: %v", value, err)
+				}
+			}
+			for _, value := range []string{"invalid", "TRUE", "1"} {
+				if err := s.ValidateTyped(key, value); err == nil {
+					t.Fatalf("invalid admission setting %q was accepted", value)
+				}
+			}
+		})
 	}
 }

@@ -107,6 +107,15 @@
     "default": false,
     "example": true
   },
+  "experimental.battery.dual-pack-admission-while-stopped": {
+    "type": "bool",
+    "description": "Enable experimental second-pack admission in ready-to-drive only while fresh ECU observations confirm stopped and throttle off and paired battery readings pass admission checks. Requires experimental.battery.dual-pack-admission=true and a confirmed running peer. Read at battery-service startup; changes require a restart.",
+    "label": "Experimental Stopped-Vehicle Battery Admission",
+    "user-visible": false,
+    "service": "battery",
+    "default": false,
+    "example": true
+  },
   "scooter.dual-battery": {
     "type": "bool",
     "description": "Use both installed main batteries when dual-battery hardware is available.",
