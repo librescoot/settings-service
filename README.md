@@ -34,6 +34,11 @@ Only these TOML top-level sections are represented: `scooter`, `cellular`, `upda
 
 `user-visible` in the schema is a presentation hint, not an access control list. A `user-visible: false` key is fully supported and settable; it is hidden from a client's basic view but is what advanced editors surface behind their advanced toggle - lsd's "Show advanced", Sunshine's advanced tier - and `lsc settings list` prints every key regardless. On the dashboard, `scootui-qt` builds fields only for the keys it explicitly maps (`// @schema <key>` annotations in `SettingsStore.h`), so `user-visible: true` additionally commits the dashboard to carrying a control for that key.
 
+`dashboard.mode` accepts `speedometer`, `navigation`, `debug`, and `motion-debug`.
+Motion debug remains a dashboard-gated diagnostic: it requires developer mode or
+testing/nightly firmware. The mode is preserved in Redis and TOML like the other
+screen choices; accepting it in the schema does not bypass the dashboard gate.
+
 ### Route-plan RPC
 
 The MDB settings-service is the sole owner of the navigation plan. Call redis-ipc

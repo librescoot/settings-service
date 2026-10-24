@@ -495,6 +495,11 @@
       {
         "value": "debug",
         "label": "Debug"
+      },
+      {
+        "value": "motion-debug",
+        "label": "Motion Debug",
+        "description": "Motion diagnostics. Requires developer mode or testing/nightly firmware."
       }
     ],
     "example": "navigation"
