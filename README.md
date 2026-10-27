@@ -10,8 +10,8 @@ Part of the [Librescoot](https://librescoot.org/) open-source platform.
 
 - Applies defaults from [`settings.schema.json`](settings.schema.json), then overlays values stored in `/data/settings.toml`.
 - Publishes the raw schema at Redis string key `settings:schema` for clients that need setting metadata.
-- Persists user-set, non-transient settings atomically to TOML, syncing both the file and the renamed directory entry before returning success; schema defaults alone are not written to the file.
-- Applies `cellular.apn` to the existing NetworkManager WWAN connection and applies `scooter.logserver` to journal-upload configuration.
+- Persists user-set, non-transient settings atomically to TOML, preserving an existing regular file's permission bits and syncing both the file and the renamed directory entry before returning success; schema defaults alone are not written to the file.
+- Persists `cellular.apn` for modem-service to apply and applies `scooter.logserver` to journal-upload configuration.
 - Synchronizes `/data/wireguard/*.conf` with NetworkManager WireGuard connections. Changed configurations are re-imported, removed files remove their matching connections, and imported connections are configured to autoconnect indefinitely.
 - Provides a persistent service-mode settings overlay.
 
@@ -30,7 +30,7 @@ redis-cli PUBLISH settings alarm.enabled
 
 On boot the service writes the effective schema defaults and TOML overlay to the hash and publishes each written field. A configured schema or initial hydration failure terminates the service before it sends systemd readiness. The deployed unit therefore starts it before vehicle-service so consumers can observe the initial settings hash.
 
-Only these TOML top-level sections are represented: `scooter`, `cellular`, `updates`, `dashboard`, `alarm`, `engine-ecu`, `keycard`, `pm`, and `trip`. Values are converted to Redis strings. Consult [`settings.schema.json`](settings.schema.json) for supported keys, defaults, types, ranges, and transient markers. The service enforces enum membership (`values`) and declared formats (`trip.expunge`'s `trip-expunge` format) during TOML hydration and on live Redis updates; an invalid value is repaired to the last persisted valid value, or to the schema default (and `never` for `trip.expunge`) when none exists. Declared types and numeric bounds are checked but logged only (`log-only`), so a type or range violation never alters the stored value.
+Settings use nested TOML tables. Common top-level sections are `scooter`, `cellular`, `updates`, `dashboard`, `alarm`, `engine-ecu`, `keycard`, `pm`, and `trip`; custom namespaces are preserved too. Values are converted to Redis strings. Consult [`settings.schema.json`](settings.schema.json) for supported keys, defaults, types, ranges, and transient markers. The service enforces enum membership (`values`) and declared formats (`trip.expunge`'s `trip-expunge` format) during TOML hydration and on live Redis updates; an invalid value is repaired to the last persisted valid value, or to the schema default (and `never` for `trip.expunge`) when none exists. Declared types and numeric bounds are checked but logged only (`log-only`), so a type or range violation never alters the stored value.
 
 `user-visible` in the schema is a presentation hint, not an access control list. A `user-visible: false` key is fully supported and settable; it is hidden from a client's basic view but is what advanced editors surface behind their advanced toggle - lsd's "Show advanced", Sunshine's advanced tier - and `lsc settings list` prints every key regardless. On the dashboard, `scootui-qt` builds fields only for the keys it explicitly maps (`// @schema <key>` annotations in `SettingsStore.h`), so `user-visible: true` additionally commits the dashboard to carrying a control for that key.
 
@@ -38,6 +38,22 @@ Only these TOML top-level sections are represented: `scooter`, `cellular`, `upda
 Motion debug remains a dashboard-gated diagnostic: it requires developer mode or
 testing/nightly firmware. The mode is preserved in Redis and TOML like the other
 screen choices; accepting it in the schema does not bypass the dashboard gate.
+
+### APN ownership
+
+`settings-service` persists `cellular.apn`, including an explicitly empty value.
+Boot hydration publishes it on `settings`; live writers use the same hash-update
+and field-notification contract described above. Other settings, including
+credentials and custom namespaces, remain unchanged by an APN-only edit.
+
+APN application requires `modem-service` v0.15.1 or later. Its APN manager owns
+the selected WWAN profile, modem attach configuration, bounded application and
+rollback, and durable profile commit with the original autoconnect policy.
+`settings-service` does not edit NetworkManager profiles or restart NetworkManager
+for APN changes, so it cannot race that transaction with a second network writer.
+Restoring an empty APN uses the same notification and persistence path as any
+other value. Persistence alone does not confirm modem application; consumers
+must verify the resulting modem and profile state.
 
 ### Route-plan RPC
 
@@ -129,7 +145,7 @@ Transient schema keys remain in Redis and are removed from TOML when encountered
 
 A boolean schema setting can provide `channel-defaults` for `stable`, `testing`, and `nightly`. At boot, settings-service infers each installed component's channel from `version:mdb[version_id]` and `version:dbc[version_id]`, then applies the matching value unless TOML contains a user-set value. If components differ, a `true` value from either component wins. `scooter.developer-mode` uses this to enable development and diagnostic controls by default on testing or nightly.
 
-For APN management, NetworkManager and the target WWAN connection must be available. WireGuard configuration files must have a `.conf` suffix in `/data/wireguard`; SHA-256 sidecar files are maintained in the same directory.
+For APN management, modem-service v0.15.1 or later, NetworkManager and the target WWAN connection must be available. WireGuard configuration files must have a `.conf` suffix in `/data/wireguard`; SHA-256 sidecar files are maintained in the same directory.
 
 ## Build and test
 
@@ -154,7 +170,7 @@ checkout is not a sibling directory.
 
 The Yocto recipe installs the binary at `/usr/bin/settings-service`, the schema at `/usr/share/settings-service/settings.schema.json`, and systemd unit `librescoot-settings.service`. The unit requires `valkey.service`, requires `/data` to be mounted, wants `NetworkManager.service`, and runs as root.
 
-Runtime dependencies are Redis/Valkey, writable `/data`, and—when APN or WireGuard features are used—NetworkManager with `nmcli`. The program accepts `SIGINT` and `SIGTERM` for graceful shutdown and emits `READY=1` when launched with a systemd notification socket.
+Runtime dependencies are Redis/Valkey and writable `/data`. APN application requires modem-service v0.15.1 or later and its NetworkManager dependencies. WireGuard synchronization requires NetworkManager with `nmcli`. The program accepts `SIGINT` and `SIGTERM` for graceful shutdown and emits `READY=1` when launched with a systemd notification socket.
 
 ## Operational and security notes
 
@@ -162,7 +178,7 @@ Runtime dependencies are Redis/Valkey, writable `/data`, and—when APN or WireG
 - Redis has no authentication or TLS configuration in this service. Keep the Redis/Valkey listener on a trusted local network and control access to clients that can modify `settings` or push overlay commands.
 - Persistence and schema-validation diagnostics report counts and setting names, without dumping setting values, rejected values, fallback values, or value-bearing validator errors.
 - A change notification without a matching hash update can cause the service to persist the current hash value; update the hash first.
-- WireGuard imports and NetworkManager changes are performed asynchronously or best-effort and failures are logged. Review the journal after configuration changes.
+- WireGuard imports are asynchronous or best-effort and failures are logged. APN application is performed by modem-service; verify its outcome independently of settings persistence.
 
 ## License
 

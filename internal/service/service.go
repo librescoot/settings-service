@@ -12,7 +12,6 @@ import (
 	"github.com/librescoot/settings-service/internal/config"
 	"github.com/librescoot/settings-service/internal/destination"
 	"github.com/librescoot/settings-service/internal/journalupload"
-	"github.com/librescoot/settings-service/internal/network"
 	"github.com/librescoot/settings-service/internal/redis"
 	"github.com/librescoot/settings-service/internal/routeplan"
 	"github.com/librescoot/settings-service/internal/schema"
@@ -202,28 +201,6 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 			return fmt.Errorf("failed to publish schema to Redis: %w", err)
 		}
 		log.Printf("Published schema to Redis key %q", redis.SchemaKey)
-	}
-
-	apnStr := ""
-	if v, ok := fields["cellular.apn"]; ok && v != nil {
-		apnStr = fmt.Sprintf("%v", v)
-	}
-	if apnStr != "" {
-		go func() {
-			currentAPN, err := network.GetCurrentAPN()
-			if err != nil {
-				log.Printf("Error reading current APN: %v", err)
-				return
-			}
-			if currentAPN != apnStr {
-				log.Printf("APN mismatch detected: NetworkManager has '%s', settings have '%s'", currentAPN, apnStr)
-				if err := network.UpdateAPN(apnStr); err != nil {
-					log.Printf("Error updating NetworkManager APN on startup: %v", err)
-				}
-			} else {
-				log.Printf("APN is already synchronized: %s", apnStr)
-			}
-		}()
 	}
 
 	logserver := ""
@@ -462,10 +439,6 @@ func (s *SettingsService) WatchSettings() {
 					}
 				}
 
-				if msg.Payload == "cellular.apn" {
-					s.updateAPNFromRedis()
-				}
-
 				if msg.Payload == "scooter.logserver" {
 					s.updateLogServerFromRedis()
 				}
@@ -523,22 +496,6 @@ func (s *SettingsService) reconcileValidatedSetting(key string) bool {
 		log.Printf("Error restoring %s: %v", key, err)
 	}
 	return false
-}
-
-func (s *SettingsService) updateAPNFromRedis() {
-	s.mu.Lock()
-	settings, err := s.redisClient.GetAllSettings()
-	s.mu.Unlock()
-	if err != nil {
-		log.Printf("Error getting settings for APN update: %v", err)
-		return
-	}
-
-	if apn, exists := settings["cellular.apn"]; exists && apn != "" {
-		if err := network.UpdateAPN(apn); err != nil {
-			log.Printf("Error updating NetworkManager APN: %v", err)
-		}
-	}
 }
 
 func (s *SettingsService) updateLogServerFromRedis() {
