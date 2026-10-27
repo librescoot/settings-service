@@ -160,6 +160,7 @@ Runtime dependencies are Redis/Valkey, writable `/data`, and—when APN or WireG
 
 - Treat `/data/settings.toml` and `/data/wireguard/` as configuration that can affect vehicle behaviour and network access. Restrict write access to trusted administrators and services.
 - Redis has no authentication or TLS configuration in this service. Keep the Redis/Valkey listener on a trusted local network and control access to clients that can modify `settings` or push overlay commands.
+- Persistence and schema-validation diagnostics report counts and setting names, without dumping setting values, rejected values, fallback values, or value-bearing validator errors.
 - A change notification without a matching hash update can cause the service to persist the current hash value; update the hash first.
 - WireGuard imports and NetworkManager changes are performed asynchronously or best-effort and failures are logged. Review the journal after configuration changes.
 

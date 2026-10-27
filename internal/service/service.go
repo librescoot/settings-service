@@ -139,7 +139,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		}
 		droppedTransient, invalid = applyTomlOverlay(cfg.ToRedisFields(), s.schema, fields, userSet)
 	}
-	for key, invalidValue := range invalid {
+	for key := range invalid {
 		fallback := s.lastPersisted[key]
 		if fallback == "" {
 			if key == "trip.expunge" {
@@ -151,7 +151,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		if fallback == "" {
 			continue
 		}
-		log.Printf("Ignoring invalid %s value %q from TOML and restoring %q", key, invalidValue, fallback)
+		log.Printf("Ignoring invalid %s value from TOML and restoring fallback", key)
 		fields[key] = fallback
 		userSet[key] = struct{}{}
 	}
@@ -253,12 +253,13 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	overlayBaseForPersist(settings, s.overlayActive, s.overlayBase)
 
 	persisted := filterUserSet(settings, s.userSetKeys)
+	// Validator errors can contain submitted values; diagnostics identify only the key.
 	for key, value := range persisted {
 		if err := s.schema.ValidateValue(key, value); err != nil {
-			return fmt.Errorf("refusing to persist invalid %s value: %w", key, err)
+			return fmt.Errorf("refusing to persist invalid %s value", key)
 		}
 		if err := s.schema.ValidateTyped(key, value); err != nil {
-			log.Printf("Schema type violation for %s value %q while persisting (log-only): %v", key, value, err)
+			log.Printf("Schema type violation for %s while persisting (log-only)", key)
 		}
 	}
 	if equalStringMaps(persisted, s.lastPersisted) {
@@ -266,9 +267,6 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	}
 
 	log.Printf("Retrieved %d settings from Redis", len(settings))
-	for k, v := range settings {
-		log.Printf("  %s = %s", k, v)
-	}
 	for field := range persisted {
 		prefix, _, _ := strings.Cut(field, ".")
 		switch prefix {
@@ -320,12 +318,12 @@ func applyTomlOverlay(toml map[string]any, sch *schema.Schema, fields map[string
 		}
 		value := fmt.Sprintf("%v", v)
 		if err := sch.ValidateValue(k, value); err != nil {
-			log.Printf("Ignoring invalid %s value from toml: %v", k, err)
+			log.Printf("Ignoring invalid %s value from toml", k)
 			invalid[k] = value
 			continue
 		}
 		if err := sch.ValidateTyped(k, value); err != nil {
-			log.Printf("Schema type violation for %s value %q from toml (log-only): %v", k, value, err)
+			log.Printf("Schema type violation for %s from toml (log-only)", k)
 		}
 		fields[k] = v
 		userSet[k] = struct{}{}
@@ -490,7 +488,7 @@ func (s *SettingsService) logTypedViolation(key string) {
 		return
 	}
 	if err := s.schema.ValidateTyped(key, value); err != nil {
-		log.Printf("Schema type violation for %s value %q (log-only): %v", key, value, err)
+		log.Printf("Schema type violation for %s (log-only)", key)
 	}
 }
 
@@ -517,10 +515,10 @@ func (s *SettingsService) reconcileValidatedSetting(key string) bool {
 		}
 	}
 	if fallback == "" {
-		log.Printf("Rejecting invalid live %s value %q without a safe fallback", key, value)
+		log.Printf("Rejecting invalid live %s value without a safe fallback", key)
 		return false
 	}
-	log.Printf("Rejecting invalid live %s value %q and restoring %q", key, value, fallback)
+	log.Printf("Rejecting invalid live %s value and restoring fallback", key)
 	if err := s.redisClient.SetSettingField(key, fallback); err != nil {
 		log.Printf("Error restoring %s: %v", key, err)
 	}
