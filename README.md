@@ -10,7 +10,7 @@ Part of the [Librescoot](https://librescoot.org/) open-source platform.
 
 - Applies defaults from [`settings.schema.json`](settings.schema.json), then overlays values stored in `/data/settings.toml`.
 - Publishes the raw schema at Redis string key `settings:schema` for clients that need setting metadata.
-- Persists user-set, non-transient settings atomically to TOML; schema defaults alone are not written to the file.
+- Persists user-set, non-transient settings atomically to TOML, syncing both the file and the renamed directory entry before returning success; schema defaults alone are not written to the file.
 - Applies `cellular.apn` to the existing NetworkManager WWAN connection and applies `scooter.logserver` to journal-upload configuration.
 - Synchronizes `/data/wireguard/*.conf` with NetworkManager WireGuard connections. Changed configurations are re-imported, removed files remove their matching connections, and imported connections are configured to autoconnect indefinitely.
 - Provides a persistent service-mode settings overlay.

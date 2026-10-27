@@ -3,9 +3,10 @@ package fileutil
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
-// Rename a synced temporary file to avoid corruption on power loss.
+// AtomicWrite syncs the contents and renamed directory entry before returning.
 func AtomicWrite(path string, perm os.FileMode, writeFn func(f *os.File) error) error {
 	tmpPath := path + ".tmp"
 
@@ -36,5 +37,13 @@ func AtomicWrite(path string, perm os.FileMode, writeFn func(f *os.File) error) 
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
 
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return fmt.Errorf("failed to open parent directory: %w", err)
+	}
+	defer dir.Close()
+	if err := dir.Sync(); err != nil {
+		return fmt.Errorf("failed to sync parent directory: %w", err)
+	}
 	return nil
 }
