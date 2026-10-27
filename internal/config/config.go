@@ -41,7 +41,16 @@ func SaveToFile(config *Config) error {
 		return fmt.Errorf("failed to create settings directory: %w", err)
 	}
 
-	return fileutil.AtomicWrite(TomlFilePath, 0644, func(f *os.File) error {
+	mode := os.FileMode(0644)
+	if info, err := os.Lstat(TomlFilePath); err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("settings path is not a regular file")
+		}
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to inspect settings file: %w", err)
+	}
+	return fileutil.AtomicWrite(TomlFilePath, mode, func(f *os.File) error {
 		return toml.NewEncoder(f).Encode(config)
 	})
 }

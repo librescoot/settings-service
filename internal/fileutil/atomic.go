@@ -15,6 +15,13 @@ func AtomicWrite(path string, perm os.FileMode, writeFn func(f *os.File) error) 
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 
+	// OpenFile does not apply perm when a temporary file already exists.
+	if err := f.Chmod(perm); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to protect temp file: %w", err)
+	}
+
 	if err := writeFn(f); err != nil {
 		_ = f.Close()
 		_ = os.Remove(tmpPath)
