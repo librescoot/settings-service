@@ -21,6 +21,8 @@ func ValidateFormat(format, value string) error {
 		return ValidateTripExpunge(value)
 	case ShortcutItemsFormat:
 		return ValidateShortcutItems(value)
+	case "sms-forward-destination":
+		return validateSMSForwardDestination(value)
 	default:
 		return fmt.Errorf("unsupported setting format %q", format)
 	}

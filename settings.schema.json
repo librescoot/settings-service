@@ -412,6 +412,16 @@
     "min": 0,
     "example": "10s"
   },
+  "sms.forward-to": {
+    "type": "string",
+    "format": "sms-forward-destination",
+    "description": "Forward newly received SMS to this international number, or off. Sending may incur carrier charges.",
+    "label": "SMS Forwarding Destination",
+    "user-visible": false,
+    "service": "modem-service",
+    "default": "off",
+    "example": "+4915112345678"
+  },
   "cellular.apn": {
     "type": "string",
     "description": "Set the APN used for LTE attachment and the data bearer. Leave empty to use the SIM operator defaults.",
