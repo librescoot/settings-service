@@ -5,18 +5,35 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/librescoot/settings-service/internal/config"
 	"github.com/librescoot/settings-service/internal/service"
 	"github.com/librescoot/settings-service/internal/wireguard"
 )
 
 var version = "dev"
+
+// systemd encodes abstract notification sockets with a leading '@'.
+func notifyReady() {
+	socket := os.Getenv("NOTIFY_SOCKET")
+	if socket == "" {
+		return
+	}
+	conn, err := net.Dial("unixgram", socket)
+	if err != nil {
+		log.Printf("sd_notify: dial %s: %v", socket, err)
+		return
+	}
+	defer conn.Close()
+	if _, err := conn.Write([]byte("READY=1")); err != nil {
+		log.Printf("sd_notify: write: %v", err)
+	}
+}
 
 func main() {
 	showVersion := flag.Bool("version", false, "Print version and exit")
@@ -53,28 +70,29 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create settings service: %v", err)
 	}
-	// Load initial settings from TOML file
+
 	if err := svc.LoadSettingsFromTOML(); err != nil {
-		log.Printf("Warning: Failed to load initial settings from TOML: %v", err)
+		svc.Close()
+		log.Fatalf("Failed to load initial settings from TOML: %v", err)
 	}
 
-	// Initialize WireGuard connections
-	wgRedis := redis.NewClient(&redis.Options{
-		Addr: redisAddr,
-	})
+	svc.ReapplyOverlayOnBoot()
+
+	// Notify dependents only after the non-persistent Redis hash is seeded.
+	notifyReady()
+
 	wgCtx, wgCancel := context.WithCancel(context.Background())
-	wgManager := wireguard.NewManager(wgRedis)
+	wgManager := wireguard.NewManager()
 	go func() {
-		defer wgRedis.Close()
 		if err := wgManager.Initialize(wgCtx); err != nil {
-			log.Printf("Error initializing WireGuard: %v", err)
+			log.Printf("Error syncing WireGuard: %v", err)
 		}
 	}()
 
-	// Start watching for Redis updates
 	go svc.WatchSettings()
 
-	// Setup signal handling
+	go svc.RunOverlayConsumer()
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -85,7 +103,6 @@ func main() {
 
 	wgCancel()
 
-	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

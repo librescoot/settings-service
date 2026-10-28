@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,17 +9,16 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/librescoot/settings-service/internal/fileutil"
+	"github.com/librescoot/settings-service/internal/schema"
 )
 
 var TomlFilePath = "/data/settings.toml"
 
-// Config is a generic two-level map: section name -> field name -> value.
-// Values can be strings (for flat leaves) or nested map[string]interface{}
-// (for sub-tables like [dashboard.saved-locations.0]).
-type Config map[string]map[string]interface{}
+// Config mirrors TOML tables directly. Setting namespaces come from the
+// schema and may grow without changing this persistence layer.
+type Config map[string]interface{}
 
-// LoadFromFile reads the TOML configuration file
-func LoadFromFile() (Config, error) {
+func LoadFromFile() (*Config, error) {
 	if _, err := os.Stat(TomlFilePath); os.IsNotExist(err) {
 		return nil, os.ErrNotExist
 	}
@@ -28,65 +28,112 @@ func LoadFromFile() (Config, error) {
 		return nil, fmt.Errorf("failed to read TOML file: %w", err)
 	}
 
-	var cfg Config
-	if err := toml.Unmarshal(data, &cfg); err != nil {
+	var config Config
+	if err := toml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse TOML file: %w", err)
 	}
 
-	return cfg, nil
+	return &config, nil
 }
 
-// SaveToFile writes the configuration to the TOML file
-func SaveToFile(cfg Config) error {
+func SaveToFile(config *Config) error {
 	if err := os.MkdirAll(filepath.Dir(TomlFilePath), 0755); err != nil {
 		return fmt.Errorf("failed to create settings directory: %w", err)
 	}
 
-	return fileutil.AtomicWrite(TomlFilePath, 0644, func(f *os.File) error {
-		return toml.NewEncoder(f).Encode(cfg)
+	mode := os.FileMode(0644)
+	if info, err := os.Lstat(TomlFilePath); err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("settings path is not a regular file")
+		}
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to inspect settings file: %w", err)
+	}
+	return fileutil.AtomicWrite(TomlFilePath, mode, func(f *os.File) error {
+		return toml.NewEncoder(f).Encode(config)
 	})
 }
 
-// ParseRedisSettings converts Redis hash fields to Config structure.
-// Splits field names at the first dot: everything before becomes the top-level
-// section, everything after is kept verbatim as the section's flat key so the
-// TOML encoder emits existing-style quoted dotted keys.
-func ParseRedisSettings(settings map[string]string) Config {
-	cfg := Config{}
-	for field, value := range settings {
-		dot := strings.IndexByte(field, '.')
-		if dot < 1 {
-			continue
-		}
-		section := field[:dot]
-		key := field[dot+1:]
-		if _, ok := cfg[section]; !ok {
-			cfg[section] = map[string]interface{}{}
-		}
-		cfg[section][key] = value
+// Section returns a top-level TOML table, creating it when needed.
+func (c Config) Section(namespace string) map[string]interface{} {
+	section, ok := c[namespace].(map[string]interface{})
+	if !ok {
+		section = make(map[string]interface{})
+		c[namespace] = section
 	}
-	return cfg
+	return section
 }
 
-// flattenSection walks a section map, handling both flat string leaves and
-// nested sub-maps (produced by TOML files that use sub-tables like
-// [dashboard.saved-locations.0]). Emits dotted Redis field names at the leaves.
+func setNested(m map[string]interface{}, segments []string, value interface{}) {
+	for i, seg := range segments {
+		if i == len(segments)-1 {
+			m[seg] = value
+			return
+		}
+		sub, ok := m[seg].(map[string]interface{})
+		if !ok {
+			sub = make(map[string]interface{})
+			m[seg] = sub
+		}
+		m = sub
+	}
+}
+
+func ParseRedisSettings(settings map[string]string, sch *schema.Schema) *Config {
+	config := make(Config)
+	for field, value := range settings {
+		segs := strings.Split(field, ".")
+		if len(segs) < 2 || segs[0] == "" {
+			continue
+		}
+		setNested(config.Section(segs[0]), segs[1:], tomlValue(sch, field, value))
+	}
+	return &config
+}
+
+// tomlValue converts a Redis string into the TOML-side value. Array-typed
+// settings decode from their JSON wire form; everything else stays a string.
+func tomlValue(sch *schema.Schema, field, value string) interface{} {
+	if setting, ok := sch.Lookup(field); ok && setting.Type == "array" {
+		var array []interface{}
+		if err := json.Unmarshal([]byte(value), &array); err == nil {
+			return array
+		}
+	}
+	return value
+}
+
 func flattenSection(prefix string, m map[string]interface{}, out map[string]interface{}) {
 	for k, v := range m {
 		key := prefix + "." + k
 		if sub, ok := v.(map[string]interface{}); ok {
 			flattenSection(key, sub, out)
 		} else {
-			out[key] = fmt.Sprintf("%v", v)
+			out[key] = redisValue(v)
 		}
 	}
 }
 
-// ToRedisFields converts Config to Redis hash fields
-func (c Config) ToRedisFields() map[string]interface{} {
+// redisValue renders a TOML-side value in its Redis string form. Arrays
+// encode as compact JSON; everything else keeps the plain string form.
+func redisValue(v interface{}) string {
+	if array, ok := v.([]interface{}); ok {
+		if data, err := json.Marshal(array); err == nil {
+			return string(data)
+		}
+	}
+	return fmt.Sprintf("%v", v)
+}
+
+func (c *Config) ToRedisFields() map[string]interface{} {
 	fields := make(map[string]interface{})
-	for prefix, section := range c {
-		flattenSection(prefix, section, fields)
+	for namespace, rawSection := range *c {
+		section, ok := rawSection.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		flattenSection(namespace, section, fields)
 	}
 	return fields
 }

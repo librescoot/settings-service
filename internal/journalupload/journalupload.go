@@ -16,9 +16,6 @@ const (
 	ServiceName = "systemd-journal-upload.service"
 )
 
-// GetCurrentLogServer reads URL= from the [Upload] section of the
-// journal-upload config. Returns "" if the file doesn't exist or the URL
-// isn't set.
 func GetCurrentLogServer() (string, error) {
 	f, err := os.Open(ConfigPath)
 	if err != nil {
@@ -50,19 +47,6 @@ func GetCurrentLogServer() (string, error) {
 	return "", nil
 }
 
-// ApplyLogServer reconciles the journal-upload config and service state
-// with the desired URL.
-//
-//	""               -> stop + disable the service
-//	config changed   -> write config, enable + restart
-//	config unchanged -> start if not running, otherwise no-op
-//
-// The generated config sets ServerKeyFile=-, ServerCertificateFile=-,
-// and TrustedCertificateFile=- so plain http:// URLs work and https://
-// URLs don't fail because journal-upload can't find the default
-// client-cert/private-key pair at /etc/ssl/{private,certs}/journal-
-// upload.pem. Both key and cert must be set together or journal-upload
-// refuses to start ("Options --key= and --cert= must be used together.").
 func ApplyLogServer(desired string) error {
 	desired = strings.TrimSpace(desired)
 
@@ -93,14 +77,7 @@ func ApplyLogServer(desired string) error {
 	return enableAndRestart()
 }
 
-// buildConfig returns the canonical journal-upload.conf content for a URL.
-// ServerKeyFile=- + ServerCertificateFile=- together tell journal-upload
-// to skip loading any client certificate / private key (journal-upload
-// rejects startup if only one of the two is set). The compiled-in default
-// paths under /etc/ssl/{private,certs}/journal-upload.pem don't exist on
-// the scooter. TrustedCertificateFile=- disables server-cert verification,
-// letting self-signed or unknown-CA https:// endpoints work without a CA
-// bundle.
+// Both client-cert settings must be disabled together or journal-upload rejects startup.
 func buildConfig(url string) string {
 	return fmt.Sprintf("[Upload]\nURL=%s\nServerKeyFile=-\nServerCertificateFile=-\nTrustedCertificateFile=-\n", url)
 }
@@ -124,7 +101,7 @@ func enableAndRestart() error {
 }
 
 func stopAndDisable() error {
-	// Ignore errors — the service may already be stopped/disabled.
+
 	_ = exec.Command("systemctl", "stop", ServiceName).Run()
 	_ = exec.Command("systemctl", "disable", ServiceName).Run()
 	log.Printf("Stopped and disabled %s (log server unset)", ServiceName)

@@ -3,14 +3,21 @@ package redis
 import (
 	"context"
 	"fmt"
+	"log"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
-	SettingsKey     = "settings"
-	SettingsChannel = "settings"
-	SchemaKey       = "settings:schema"
+	SettingsKey         = "settings"
+	SettingsChannel     = "settings"
+	SchemaKey           = "settings:schema"
+	DashboardKey        = "dashboard"
+	DashboardChannel    = "dashboard"
+	DashboardReadyField = "ready"
+
+	// OverlayList is the command queue for apply:service and clear:service.
+	OverlayList = "settings:overlay"
 )
 
 type Client struct {
@@ -19,7 +26,7 @@ type Client struct {
 	ctx    context.Context
 }
 
-// NewClient creates a new Redis client with pubsub subscription
+// Subscribe is deliberately deferred until boot hydration is complete.
 func NewClient(ctx context.Context, addr string) (*Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
@@ -31,26 +38,24 @@ func NewClient(ctx context.Context, addr string) (*Client, error) {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	pubsub := client.Subscribe(ctx, SettingsChannel)
-
 	return &Client{
 		client: client,
-		pubsub: pubsub,
 		ctx:    ctx,
 	}, nil
 }
 
-// FlushSettings clears all settings from Redis
+func (c *Client) Subscribe() {
+	c.pubsub = c.client.Subscribe(c.ctx, SettingsChannel, DashboardChannel)
+}
+
 func (c *Client) FlushSettings() error {
 	return c.client.Del(c.ctx, SettingsKey).Err()
 }
 
-// GetAllSettings retrieves all settings from Redis
 func (c *Client) GetAllSettings() (map[string]string, error) {
 	return c.client.HGetAll(c.ctx, SettingsKey).Result()
 }
 
-// SetSettings stores multiple settings in Redis
 func (c *Client) SetSettings(fields map[string]interface{}) error {
 	if len(fields) == 0 {
 		return nil
@@ -65,31 +70,87 @@ func (c *Client) SetSettings(fields map[string]interface{}) error {
 	return err
 }
 
-// ReplaceSettings atomically deletes all settings, writes new ones, and
-// publishes a reload notification so subscribers refresh their state.
+// ReplaceSettings atomically publishes one field notification per updated value,
+// so consumers never observe a partial settings hash.
 func (c *Client) ReplaceSettings(fields map[string]interface{}) error {
-	pipe := c.client.Pipeline()
-	pipe.Del(c.ctx, SettingsKey)
-	for field, value := range fields {
-		pipe.HSet(c.ctx, SettingsKey, field, value)
-	}
-	pipe.Publish(c.ctx, SettingsChannel, "reload")
-	_, err := pipe.Exec(c.ctx)
+	_, err := c.client.TxPipelined(c.ctx, func(pipe redis.Pipeliner) error {
+		for field, value := range fields {
+			pipe.HSet(c.ctx, SettingsKey, field, value)
+		}
+		for field := range fields {
+			pipe.Publish(c.ctx, SettingsChannel, field)
+		}
+		return nil
+	})
 	return err
 }
 
-// WatchChannel returns the pubsub channel for monitoring updates
+// DeleteSettingsFields also notifies consumers to clear stale transient values.
+func (c *Client) DeleteSettingsFields(fields []string) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	_, err := c.client.TxPipelined(c.ctx, func(pipe redis.Pipeliner) error {
+		pipe.HDel(c.ctx, SettingsKey, fields...)
+		for _, f := range fields {
+			pipe.Publish(c.ctx, SettingsChannel, f)
+		}
+		return nil
+	})
+	return err
+}
+
 func (c *Client) WatchChannel() <-chan *redis.Message {
 	return c.pubsub.Channel()
 }
 
-// SetKey sets a plain string key in Redis.
 func (c *Client) SetKey(key, value string) error {
 	return c.client.Set(c.ctx, key, value, 0).Err()
 }
 
-// Close cleanly shuts down the Redis connections
 func (c *Client) Close() {
-	c.pubsub.Close()
-	c.client.Close()
+	if c.pubsub != nil {
+		if err := c.pubsub.Close(); err != nil {
+			log.Printf("Error closing Redis pubsub: %v", err)
+		}
+	}
+	if err := c.client.Close(); err != nil {
+		log.Printf("Error closing Redis client: %v", err)
+	}
+}
+
+func (c *Client) BRPopOverlay() (string, error) {
+	res, err := c.client.BRPop(c.ctx, 0, OverlayList).Result()
+	if err != nil {
+		return "", err
+	}
+	if len(res) < 2 {
+		return "", fmt.Errorf("unexpected BRPop response")
+	}
+	return res[1], nil
+}
+
+func (c *Client) GetSettingField(field string) (value string, existed bool, err error) {
+	return c.GetHashField(SettingsKey, field)
+}
+
+func (c *Client) GetHashField(key, field string) (value string, existed bool, err error) {
+	v, err := c.client.HGet(c.ctx, key, field).Result()
+	if err == redis.Nil {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return v, true, nil
+}
+
+// SetSettingField follows the public per-field settings notification contract.
+func (c *Client) SetSettingField(field, value string) error {
+	_, err := c.client.TxPipelined(c.ctx, func(pipe redis.Pipeliner) error {
+		pipe.HSet(c.ctx, SettingsKey, field, value)
+		pipe.Publish(c.ctx, SettingsChannel, field)
+		return nil
+	})
+	return err
 }

@@ -4,103 +4,111 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type EnumValue struct {
-	Value string `json:"value"`
-	Label string `json:"label"`
+	Value       string `json:"value"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
 }
 
 type Setting struct {
-	Type        string      `json:"type"`
-	Description string      `json:"description"`
-	Label       string      `json:"label,omitempty"`
-	UserVisible bool        `json:"user-visible,omitempty"`
-	Service     string      `json:"service,omitempty"`
-	Default     any         `json:"default,omitempty"`
-	Values      []EnumValue `json:"values,omitempty"`
-	Unit        string      `json:"unit,omitempty"`
-	Min         *float64    `json:"min,omitempty"`
-	Max         *float64    `json:"max,omitempty"`
-	Example     any         `json:"example,omitempty"`
-	ReadOnly    bool        `json:"read-only,omitempty"`
-	Pattern     string      `json:"pattern,omitempty"`
-}
-
-// patternSetting is a schema entry whose key contains wildcard segments.
-type patternSetting struct {
-	segments []string
-	setting  Setting
+	Type            string          `json:"type"`
+	Description     string          `json:"description"`
+	Label           string          `json:"label,omitempty"`
+	UserVisible     bool            `json:"user-visible,omitempty"`
+	Service         string          `json:"service,omitempty"`
+	Default         any             `json:"default,omitempty"`
+	Values          []EnumValue     `json:"values,omitempty"`
+	Unit            string          `json:"unit,omitempty"`
+	Min             *float64        `json:"min,omitempty"`
+	Max             *float64        `json:"max,omitempty"`
+	Example         any             `json:"example,omitempty"`
+	ReadOnly        bool            `json:"read-only,omitempty"`
+	Pattern         string          `json:"pattern,omitempty"`
+	Format          string          `json:"format,omitempty"`
+	Transient       bool            `json:"transient,omitempty"`
+	ChannelDefaults map[string]bool `json:"channel-defaults,omitempty"`
 }
 
 type Schema struct {
-	// Settings holds exact-match entries, keyed by fully-dotted key.
 	Settings map[string]Setting
-	// Patterns holds entries whose key has at least one "*" segment, e.g.
-	// "dashboard.saved-locations.*.latitude". Exact matches in Settings
-	// take precedence over patterns during lookup.
-	Patterns []patternSetting
 	Raw      []byte
 }
 
 func Parse(data []byte) (*Schema, error) {
-	var raw map[string]Setting
-	if err := json.Unmarshal(data, &raw); err != nil {
+	var settings map[string]Setting
+	if err := json.Unmarshal(data, &settings); err != nil {
 		return nil, fmt.Errorf("parsing schema: %w", err)
 	}
-	s := &Schema{
-		Settings: make(map[string]Setting),
+	return &Schema{
+		Settings: settings,
 		Raw:      data,
-	}
-	for key, setting := range raw {
-		segs := strings.Split(key, ".")
-		wildcard := false
-		for _, seg := range segs {
-			if seg == "*" {
-				wildcard = true
-				break
-			}
-		}
-		if wildcard {
-			s.Patterns = append(s.Patterns, patternSetting{segments: segs, setting: setting})
-		} else {
-			s.Settings[key] = setting
-		}
-	}
-	return s, nil
+	}, nil
 }
 
-// Lookup finds the Setting matching key, preferring exact matches over patterns.
+// Lookup resolves exact entries first, then indexed placeholders and explicit
+// wildcard segments. Indexed placeholders only match decimal indices.
 func (s *Schema) Lookup(key string) (Setting, bool) {
+	if s == nil {
+		return Setting{}, false
+	}
 	if setting, ok := s.Settings[key]; ok {
 		return setting, true
 	}
-	segs := strings.Split(key, ".")
-	for _, p := range s.Patterns {
-		if matchSegments(p.segments, segs) {
-			return p.setting, true
+	parts := strings.Split(key, ".")
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		numeric := true
+		for _, c := range part {
+			if c < '0' || c > '9' {
+				numeric = false
+				break
+			}
+		}
+		if numeric {
+			copyParts := append([]string(nil), parts...)
+			copyParts[i] = "0"
+			if setting, ok := s.Settings[strings.Join(copyParts, ".")]; ok && setting.Pattern == "indexed" {
+				return setting, true
+			}
 		}
 	}
-	return Setting{}, false
-}
-
-// Has reports whether key is covered by the schema (exact or wildcard).
-func (s *Schema) Has(key string) bool {
-	_, ok := s.Lookup(key)
-	return ok
-}
-
-func matchSegments(pattern, key []string) bool {
-	if len(pattern) != len(key) {
-		return false
-	}
-	for i, p := range pattern {
-		if p != "*" && p != key[i] {
-			return false
+	best := ""
+	bestWildcards := len(parts) + 1
+	var found Setting
+	for pattern, setting := range s.Settings {
+		if !isWildcardKey(pattern) {
+			continue
+		}
+		segments := strings.Split(pattern, ".")
+		if len(segments) != len(parts) {
+			continue
+		}
+		wildcards := 0
+		matched := true
+		for i, segment := range segments {
+			if segment == "*" {
+				wildcards++
+				if parts[i] == "" {
+					matched = false
+					break
+				}
+			} else if segment != parts[i] {
+				matched = false
+				break
+			}
+		}
+		if matched && (wildcards < bestWildcards || (wildcards == bestWildcards && pattern < best)) {
+			best, bestWildcards, found = pattern, wildcards, setting
 		}
 	}
-	return true
+	return found, best != ""
 }
 
 func LoadFile(path string) (*Schema, error) {
@@ -111,10 +119,183 @@ func LoadFile(path string) (*Schema, error) {
 	return Parse(data)
 }
 
+// IsTransient reports settings that are never read from or written to TOML.
+// Defaults still hydrate into Redis each boot; runtime overrides do not persist.
+func (s *Schema) IsTransient(key string) bool {
+	if s == nil {
+		return false
+	}
+	setting, ok := s.Lookup(key)
+	return ok && setting.Transient
+}
+
+// ValidateValue applies the setting's explicit format and enum constraints.
+func (s *Schema) ValidateValue(key, value string) error {
+	if s == nil {
+		return nil
+	}
+	setting, ok := s.Lookup(key)
+	if !ok {
+		return nil
+	}
+	if err := ValidateFormat(setting.Format, value); err != nil {
+		return err
+	}
+	if len(setting.Values) == 0 {
+		return nil
+	}
+	for _, candidate := range setting.Values {
+		if value == candidate.Value {
+			return nil
+		}
+	}
+	return fmt.Errorf("value %q is not allowed for %s", value, key)
+}
+
+func (s *Schema) HasValidation(key string) bool {
+	if s == nil {
+		return false
+	}
+	setting, ok := s.Lookup(key)
+	return ok && (setting.Format != "" || len(setting.Values) != 0)
+}
+
+// ValidateTyped checks a value against the setting's declared type and numeric
+// bounds. Callers log violations without rejecting the value: format and enum
+// validation remain the only enforced kinds.
+func (s *Schema) ValidateTyped(key, value string) error {
+	if s == nil {
+		return nil
+	}
+	setting, ok := s.Lookup(key)
+	if !ok {
+		return nil
+	}
+	switch setting.Type {
+	case "bool":
+		if value != "true" && value != "false" {
+			return fmt.Errorf("value %q is not a bool", value)
+		}
+		return nil
+	case "int", "integer":
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("value %q is not an int", value)
+		}
+		return checkBounds(setting, float64(parsed))
+	case "float":
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return fmt.Errorf("value %q is not a float", value)
+		}
+		return checkBounds(setting, parsed)
+	case "duration":
+		parsed, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("value %q is not a duration", value)
+		}
+		return checkBounds(setting, parsed.Seconds())
+	default:
+		// string, url, enum, and untyped settings carry no declared bounds.
+		return nil
+	}
+}
+
+func checkBounds(setting Setting, value float64) error {
+	if setting.Min != nil && value < *setting.Min {
+		return fmt.Errorf("value %v is below minimum %v", value, *setting.Min)
+	}
+	if setting.Max != nil && value > *setting.Max {
+		return fmt.Errorf("value %v is above maximum %v", value, *setting.Max)
+	}
+	return nil
+}
+
+func (s *Schema) DefaultValue(key string) (string, bool) {
+	if s == nil {
+		return "", false
+	}
+	setting, ok := s.Settings[key]
+	if !ok || setting.Default == nil {
+		return "", false
+	}
+	return stringifyDefault(setting.Default), true
+}
+
+// stringifyDefault renders a schema default in its Redis string form. Arrays
+// become compact JSON so the stored value round-trips through TOML as an array.
+func stringifyDefault(value any) string {
+	if array, ok := value.([]any); ok {
+		if data, err := json.Marshal(array); err == nil {
+			return string(data)
+		}
+	}
+	return fmt.Sprintf("%v", value)
+}
+
+func isWildcardKey(key string) bool {
+	for _, part := range strings.Split(key, ".") {
+		if part == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+// ChannelDefaults returns defaults selected by any installed component channel.
+// A true value wins if components are on different channels, so development
+// capabilities remain available while either board is on testing or nightly.
+func (s *Schema) ChannelDefaults(channels []string) map[string]string {
+	defaults := make(map[string]string)
+	if s == nil {
+		return defaults
+	}
+	for key, setting := range s.Settings {
+		if isWildcardKey(key) {
+			continue
+		}
+		matched := false
+		value := false
+		for _, channel := range channels {
+			channelValue, ok := setting.ChannelDefaults[channel]
+			if !ok {
+				continue
+			}
+			matched = true
+			value = value || channelValue
+		}
+		if matched {
+			defaults[key] = fmt.Sprintf("%t", value)
+		}
+	}
+	return defaults
+}
+
+// ReleaseChannel infers the installed release channel from an image version.
+func ReleaseChannel(version string) string {
+	fields := strings.Fields(version)
+	if len(fields) == 0 {
+		return ""
+	}
+	version = strings.ToLower(fields[0])
+	switch {
+	case strings.HasPrefix(version, "nightly-"), strings.HasPrefix(version, "custom-nightly-"):
+		return "nightly"
+	case strings.HasPrefix(version, "testing-"):
+		return "testing"
+	case strings.HasPrefix(version, "v"), version[0] >= '0' && version[0] <= '9':
+		return "stable"
+	default:
+		return ""
+	}
+}
+
+// Defaults includes transient defaults because transient controls persistence,
+// not boot-time Redis hydration.
 func (s *Schema) Defaults() map[string]string {
 	defaults := make(map[string]string)
 	for key, setting := range s.Settings {
-		if setting.Default == nil {
+		if isWildcardKey(key) || setting.Default == nil {
 			continue
 		}
 		switch v := setting.Default.(type) {
@@ -126,6 +307,8 @@ func (s *Schema) Defaults() map[string]string {
 			}
 		case bool:
 			defaults[key] = fmt.Sprintf("%v", v)
+		case []any:
+			defaults[key] = stringifyDefault(v)
 		default:
 			defaults[key] = fmt.Sprintf("%v", v)
 		}

@@ -1,76 +1,187 @@
-# LibreScoot Settings Service
+# Librescoot Settings Service
 
-[![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]
+Part of the [Librescoot](https://librescoot.org/) open-source platform.
 
-A Go service that synchronizes settings between Redis and a TOML configuration file.
+## Overview
 
-## Usage
+`settings-service` is the persistent-settings bridge for a Librescoot vehicle. It seeds the volatile Redis/Valkey `settings` hash from `/data/settings.toml` at boot, exposes the installed settings schema, and persists user changes received through Redis.
 
-The service monitors Redis for changes and maintains settings in `/data/settings.toml` with the following structure:
+## Capabilities
+
+- Applies defaults from [`settings.schema.json`](settings.schema.json), then overlays values stored in `/data/settings.toml`.
+- Publishes the raw schema at Redis string key `settings:schema` for clients that need setting metadata.
+- Persists user-set, non-transient settings atomically to TOML, preserving an existing regular file's permission bits and syncing both the file and the renamed directory entry before returning success; schema defaults alone are not written to the file.
+- Persists `cellular.apn` for modem-service to apply and applies `scooter.logserver` to journal-upload configuration.
+- Synchronizes `/data/wireguard/*.conf` with NetworkManager WireGuard connections. Changed configurations are re-imported, removed files remove their matching connections, and imported connections are configured to autoconnect indefinitely.
+- Provides a persistent service-mode settings overlay.
+
+## Operation and interfaces
+
+### Settings contract
+
+The service uses Redis/Valkey database 0 at `REDIS_ADDR` (default `localhost:6379`). Settings are flat fields in hash `settings`; a field name uses a section prefix and dot-separated nesting, for example `alarm.enabled` or `scooter.speed-limit`.
+
+A writer must update the hash **and** notify channel `settings` with the field name. For example:
+
+```sh
+redis-cli HSET settings alarm.enabled false
+redis-cli PUBLISH settings alarm.enabled
+```
+
+On boot the service writes the effective schema defaults and TOML overlay to the hash and publishes each written field. A configured schema or initial hydration failure terminates the service before it sends systemd readiness. The deployed unit therefore starts it before vehicle-service so consumers can observe the initial settings hash.
+
+Settings use nested TOML tables. Common top-level sections are `scooter`, `cellular`, `updates`, `dashboard`, `alarm`, `engine-ecu`, `keycard`, `pm`, and `trip`; custom namespaces are preserved too. Values are converted to Redis strings. Consult [`settings.schema.json`](settings.schema.json) for supported keys, defaults, types, ranges, and transient markers. The service enforces enum membership (`values`) and declared formats (`trip.expunge`'s `trip-expunge` format) during TOML hydration and on live Redis updates; an invalid value is repaired to the last persisted valid value, or to the schema default (and `never` for `trip.expunge`) when none exists. Declared types and numeric bounds are checked but logged only (`log-only`), so a type or range violation never alters the stored value.
+
+`user-visible` in the schema is a presentation hint, not an access control list. A `user-visible: false` key is fully supported and settable; it is hidden from a client's basic view but is what advanced editors surface behind their advanced toggle - lsd's "Show advanced", Sunshine's advanced tier - and `lsc settings list` prints every key regardless. On the dashboard, `scootui-qt` builds fields only for the keys it explicitly maps (`// @schema <key>` annotations in `SettingsStore.h`), so `user-visible: true` additionally commits the dashboard to carrying a control for that key.
+
+`dashboard.mode` accepts `speedometer`, `navigation`, `debug`, and `motion-debug`.
+Motion debug remains a dashboard-gated diagnostic: it requires developer mode or
+testing/nightly firmware. The mode is preserved in Redis and TOML like the other
+screen choices; accepting it in the schema does not bypass the dashboard gate.
+
+### APN ownership
+
+`settings-service` persists `cellular.apn`, including an explicitly empty value.
+Boot hydration publishes it on `settings`; live writers use the same hash-update
+and field-notification contract described above. Other settings, including
+credentials and custom namespaces, remain unchanged by an APN-only edit.
+
+APN application requires `modem-service` v0.15.1 or later. Its APN manager owns
+the selected WWAN profile, modem attach configuration, bounded application and
+rollback, and durable profile commit with the original autoconnect policy.
+`settings-service` does not edit NetworkManager profiles or restart NetworkManager
+for APN changes, so it cannot race that transaction with a second network writer.
+Restoring an empty APN uses the same notification and persistence path as any
+other value. Persistence alone does not confirm modem application; consumers
+must verify the resulting modem and profile state.
+
+### Route-plan RPC
+
+The MDB settings-service is the sole owner of the navigation plan. Call redis-ipc
+`CallMethod` on `settings:route-plan` (one serialized handler, timeout and errors
+must be handled by every caller). The JSON request/response contract is:
+
+| Method | Request JSON | Response |
+|---|---|---|
+| `plan.get` | `{}` | plan |
+| `plan.replace` | `{"stops":[{"lat":52.5,"lon":13.4,"label":"Home"}],"start_step":0}` (`start_step` optional) | plan |
+| `plan.append` | `{"stop":{"lat":52.5,"lon":13.4,"label":"Home"}}` | plan |
+| `plan.remove` | `{"index":0,"expected_revision":3}` | plan |
+| `plan.move` | `{"from_index":0,"to_index":1,"expected_revision":3}` | plan |
+| `plan.jump` | `{"index":1,"expected_revision":3}` | plan |
+| `plan.unreach` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid"}` | plan |
+| `plan.set-keep-current` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid","keep":false}` | plan |
+| `plan.reached` | `{"expected_plan_id":"uuid","expected_stop_id":"uuid"}` | plan |
+| `plan.advance` | same as `plan.reached` | plan |
+| `plan.clear` | `{}` or `{"expected_plan_id":"uuid"}` | plan |
+
+A plan is `{"id":"uuid","revision":3,"stops":[{"id":"uuid","lat":52.5,"lon":13.4,"label":"Home","reached":false}],"current_step":0,"keep_current_stop":false}`.
+An empty plan has `id:""`, `stops:[]`, and `current_step:0`.
+Indices and `current_step` are zero-based. IDs are opaque UUIDs. Revisions
+increase on each committed mutation, including clear; `plan.reached` on an
+already reached current stop is idempotent. `plan.advance` requires a next stop
+and may skip an unreached stop; the previous stop's `reached` flag is unchanged.
+Replace requires 1–32 stops and atomically selects `start_step` (default 0),
+marking earlier stops reached. Append accepts one stop, creating a new plan if
+empty. Move preserves stop IDs and the current target; jump selects a stop and
+sets reached flags for earlier stops. Unreach clears the current stop's reached
+flag and enables `keep_current_stop`, suppressing a repeated arrival while the
+rider remains there. `plan.set-keep-current` clears that suppression on dismount;
+the flag survives an owner restart and resets when the current hop changes. Move
+and jump require an exact revision. Latitude must be
+finite and within [-90,90], longitude within [-180,180]. Remove requires an
+exact revision; progress and optional guarded clear require matching IDs.
+Invalid or stale requests return RPC errors without changing the plan. A
+missing service is an RPC error, not permission to write Redis directly.
+
+The entire snapshot is synced to `settings-route-plan.json` beside the configured
+settings TOML before a successful reply or Redis publication. On startup it is
+re-published even when empty. If no snapshot exists, an active legacy
+`dashboard.route-plan.*` plan is imported. A `navigation` hash target without
+an active persisted plan is not imported: it may be a completed trip or an
+unconfirmed destination, and freshness cannot be established. Clients must
+re-send such a destination. Migration runs only once.
+The owner atomically updates hash `navigation` with JSON `plan`, decimal
+`revision`, compatibility `waypoints` (JSON array of lat/lon/label),
+`current-step`, `destination`, `latitude`, `longitude`, `address`, and
+`timestamp`; it then publishes the field names and `updated` on channel
+`navigation`. Cleared compatibility fields are empty strings. Clients must
+read `navigation[plan]` as a complete snapshot rather than combine notifications.
+
+### Service-mode overlay
+
+Commands are consumed from Redis list `settings:overlay` with `BRPOP`:
+
+```sh
+redis-cli LPUSH settings:overlay apply:service
+redis-cli LPUSH settings:overlay clear:service
+```
+
+`apply:service` temporarily applies these settings: `scooter.auto-standby-seconds=0`, `pm.hibernation-timer=0`, `pm.default-state=run`, `alarm.enabled=false`, `scooter.usb0-policy=always-on`, `dashboard.mode=debug`, and `scooter.handlebar-unlocked=true`. It reports the state through `settings.dashboard.service-mode-active` and records whether the overlay was active in `/data/service-mode.json`. User edits to an overlaid field update the value to restore and the overlay value is reasserted until `clear:service`.
+
+### Command-line options
+
+```text
+settings-service [--version]
+  --settings-file PATH          defaults to /data/settings.toml (route snapshot alongside it)
+  --wireguard-config-dir PATH   defaults to /data/wireguard
+  --schema PATH                 defaults to /usr/share/settings-service/settings.schema.json
+```
+
+## Configuration
+
+`/data/settings.toml` is created when a persistable user-set setting is saved. A minimal example is:
 
 ```toml
-[scooter]
-speed_limit = "25"
-mode = "eco"
+[alarm]
+enabled = true
+honk = false
 
 [cellular]
-apn = "internet.provider.com"
+apn = "example.apn"
 ```
 
-## Redis Commands
+Transient schema keys remain in Redis and are removed from TOML when encountered. The service preserves the effective base value rather than its temporary overlay value when saving while service mode is active.
 
-Settings must be prefixed with their section name:
+A boolean schema setting can provide `channel-defaults` for `stable`, `testing`, and `nightly`. At boot, settings-service infers each installed component's channel from `version:mdb[version_id]` and `version:dbc[version_id]`, then applies the matching value unless TOML contains a user-set value. If components differ, a `true` value from either component wins. `scooter.developer-mode` uses this to enable development and diagnostic controls by default on testing or nightly.
 
-```bash
-# Set scooter settings
-HSET settings scooter.speed_limit "25"
-PUBLISH settings scooter.speed_limit
+For APN management, modem-service v0.15.1 or later, NetworkManager and the target WWAN connection must be available. WireGuard configuration files must have a `.conf` suffix in `/data/wireguard`; SHA-256 sidecar files are maintained in the same directory.
 
-HSET settings scooter.mode "eco"
-PUBLISH settings scooter.mode
+## Build and test
 
-# Set cellular settings
-HSET settings cellular.apn "internet.lebara.de"
-PUBLISH settings cellular.apn
+Requires Go and the dependencies declared in `go.mod`.
+
+```sh
+make build       # static Linux ARMv7 binary: bin/settings-service
+make build-host  # host binary: bin/settings-service-host
+make test
+make lint        # requires golangci-lint
 ```
 
-## Special Features
+`make fmt`, `make deps`, and `make clean` are also available.
 
-- **APN Management**: When `cellular.apn` is updated, the service automatically updates `/etc/NetworkManager/system-connections/wwan.nmconnection` if it exists
-- **Startup Sync**: On startup, the service reads `/data/settings.toml` and populates Redis after flushing existing settings
-- **Empty Config Handling**: If the TOML file doesn't exist or has an empty `[scooter]` section, Redis settings are flushed
-- **WireGuard Management**: On startup, the service:
-  - Deletes all existing WireGuard connections from NetworkManager
-  - Waits 120 seconds
-  - Imports all `*.conf` files from `/data/wireguard/` as new WireGuard connections
+`test/e2e-destination.sh` runs a cross-process check of the destination API: a
+real settings-service and a real `lsc` against a throwaway redis (port 6399),
+covering allocation, UUID lifecycle, deletion, item pruning, boot healing, and
+TOML persistence. It builds both binaries itself; set `LSC_SRC` when the `lsc`
+checkout is not a sibling directory.
 
-## Environment Variables
+## Deployment and runtime dependencies
 
-- `REDIS_ADDR`: Redis server address (default: `localhost:6379`)
+The Yocto recipe installs the binary at `/usr/bin/settings-service`, the schema at `/usr/share/settings-service/settings.schema.json`, and systemd unit `librescoot-settings.service`. The unit requires `valkey.service`, requires `/data` to be mounted, wants `NetworkManager.service`, and runs as root.
 
-## Building
+Runtime dependencies are Redis/Valkey and writable `/data`. APN application requires modem-service v0.15.1 or later and its NetworkManager dependencies. WireGuard synchronization requires NetworkManager with `nmcli`. The program accepts `SIGINT` and `SIGTERM` for graceful shutdown and emits `READY=1` when launched with a systemd notification socket.
 
-```bash
-make build       # Build for ARM7
-make build-amd64 # Build for AMD64
-```
+## Operational and security notes
+
+- Treat `/data/settings.toml` and `/data/wireguard/` as configuration that can affect vehicle behaviour and network access. Restrict write access to trusted administrators and services.
+- Redis has no authentication or TLS configuration in this service. Keep the Redis/Valkey listener on a trusted local network and control access to clients that can modify `settings` or push overlay commands.
+- Persistence and schema-validation diagnostics report counts and setting names, without dumping setting values, rejected values, fallback values, or value-bearing validator errors.
+- A change notification without a matching hash update can cause the service to persist the current hash value; update the hash first.
+- WireGuard imports are asynchronous or best-effort and failures are logged. APN application is performed by modem-service; verify its outcome independently of settings persistence.
 
 ## License
 
-This work is licensed under a
-[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License][cc-by-nc-sa].
+This project is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](LICENSE).
 
-[![CC BY-NC-SA 4.0][cc-by-nc-sa-image]][cc-by-nc-sa]
-
-[cc-by-nc-sa]: http://creativecommons.org/licenses/by-nc-sa/4.0/
-[cc-by-nc-sa-image]: https://licensebuttons.net/l/by-nc-sa/4.0/88x31.png
-[cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
----
-
-Made with ❤️ by the LibreScoot community
-
+Made with ❤️ by the Librescoot community
