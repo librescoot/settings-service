@@ -95,7 +95,7 @@ func ParseRedisSettings(settings map[string]string, sch *schema.Schema) *Config 
 // tomlValue converts a Redis string into the TOML-side value. Array-typed
 // settings decode from their JSON wire form; everything else stays a string.
 func tomlValue(sch *schema.Schema, field, value string) interface{} {
-	if sch != nil && sch.Settings[field].Type == "array" {
+	if setting, ok := sch.Lookup(field); ok && setting.Type == "array" {
 		var array []interface{}
 		if err := json.Unmarshal([]byte(value), &array); err == nil {
 			return array

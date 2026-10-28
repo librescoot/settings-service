@@ -50,6 +50,67 @@ func Parse(data []byte) (*Schema, error) {
 	}, nil
 }
 
+// Lookup resolves exact entries first, then indexed placeholders and explicit
+// wildcard segments. Indexed placeholders only match decimal indices.
+func (s *Schema) Lookup(key string) (Setting, bool) {
+	if s == nil {
+		return Setting{}, false
+	}
+	if setting, ok := s.Settings[key]; ok {
+		return setting, true
+	}
+	parts := strings.Split(key, ".")
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		numeric := true
+		for _, c := range part {
+			if c < '0' || c > '9' {
+				numeric = false
+				break
+			}
+		}
+		if numeric {
+			copyParts := append([]string(nil), parts...)
+			copyParts[i] = "0"
+			if setting, ok := s.Settings[strings.Join(copyParts, ".")]; ok && setting.Pattern == "indexed" {
+				return setting, true
+			}
+		}
+	}
+	best := ""
+	bestWildcards := len(parts) + 1
+	var found Setting
+	for pattern, setting := range s.Settings {
+		if !isWildcardKey(pattern) {
+			continue
+		}
+		segments := strings.Split(pattern, ".")
+		if len(segments) != len(parts) {
+			continue
+		}
+		wildcards := 0
+		matched := true
+		for i, segment := range segments {
+			if segment == "*" {
+				wildcards++
+				if parts[i] == "" {
+					matched = false
+					break
+				}
+			} else if segment != parts[i] {
+				matched = false
+				break
+			}
+		}
+		if matched && (wildcards < bestWildcards || (wildcards == bestWildcards && pattern < best)) {
+			best, bestWildcards, found = pattern, wildcards, setting
+		}
+	}
+	return found, best != ""
+}
+
 func LoadFile(path string) (*Schema, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -64,7 +125,7 @@ func (s *Schema) IsTransient(key string) bool {
 	if s == nil {
 		return false
 	}
-	setting, ok := s.Settings[key]
+	setting, ok := s.Lookup(key)
 	return ok && setting.Transient
 }
 
@@ -73,7 +134,7 @@ func (s *Schema) ValidateValue(key, value string) error {
 	if s == nil {
 		return nil
 	}
-	setting, ok := s.Settings[key]
+	setting, ok := s.Lookup(key)
 	if !ok {
 		return nil
 	}
@@ -95,7 +156,7 @@ func (s *Schema) HasValidation(key string) bool {
 	if s == nil {
 		return false
 	}
-	setting, ok := s.Settings[key]
+	setting, ok := s.Lookup(key)
 	return ok && (setting.Format != "" || len(setting.Values) != 0)
 }
 
@@ -106,7 +167,7 @@ func (s *Schema) ValidateTyped(key, value string) error {
 	if s == nil {
 		return nil
 	}
-	setting, ok := s.Settings[key]
+	setting, ok := s.Lookup(key)
 	if !ok {
 		return nil
 	}
@@ -172,6 +233,15 @@ func stringifyDefault(value any) string {
 	return fmt.Sprintf("%v", value)
 }
 
+func isWildcardKey(key string) bool {
+	for _, part := range strings.Split(key, ".") {
+		if part == "*" {
+			return true
+		}
+	}
+	return false
+}
+
 // ChannelDefaults returns defaults selected by any installed component channel.
 // A true value wins if components are on different channels, so development
 // capabilities remain available while either board is on testing or nightly.
@@ -181,6 +251,9 @@ func (s *Schema) ChannelDefaults(channels []string) map[string]string {
 		return defaults
 	}
 	for key, setting := range s.Settings {
+		if isWildcardKey(key) {
+			continue
+		}
 		matched := false
 		value := false
 		for _, channel := range channels {
@@ -222,7 +295,7 @@ func ReleaseChannel(version string) string {
 func (s *Schema) Defaults() map[string]string {
 	defaults := make(map[string]string)
 	for key, setting := range s.Settings {
-		if setting.Default == nil {
+		if isWildcardKey(key) || setting.Default == nil {
 			continue
 		}
 		switch v := setting.Default.(type) {
