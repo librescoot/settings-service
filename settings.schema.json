@@ -92,7 +92,7 @@
     "label": "Horn During Alarm",
     "user-visible": true,
     "service": "alarm-service",
-    "default": false,
+    "default": true,
     "example": true
   },
   "alarm.duration": {
