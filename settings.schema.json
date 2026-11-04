@@ -10,7 +10,7 @@
   },
   "alarm.armed-led": {
     "type": "bool",
-    "description": "Pulse the dashboard LED red while the alarm is armed in stand-by. Keycard feedback takes priority.",
+    "description": "Pulse the dashboard LED red while the alarm is armed in stand-by or low-power states, while LED power is available. Keycard feedback takes priority.",
     "label": "Alarm Armed LED",
     "user-visible": true,
     "service": "keycard-service",
