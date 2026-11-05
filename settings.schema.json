@@ -17,6 +17,15 @@
     "default": false,
     "example": true
   },
+  "alarm.armed-led-hibernate": {
+    "type": "bool",
+    "description": "Keep the armed alarm LED blinking during hibernation when alarm.armed-led is enabled. Requires compatible nRF firmware and increases standby power use. Deep low-battery hibernation still turns the LED off.",
+    "label": "Alarm Armed LED in Hibernation",
+    "user-visible": false,
+    "service": "bluetooth-service",
+    "default": true,
+    "example": false
+  },
   "alarm.seatbox-trigger": {
     "type": "bool",
     "description": "Trigger the alarm when the seatbox is opened without authorization.",
