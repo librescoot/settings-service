@@ -126,11 +126,7 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 			return err
 		}
 		log.Printf("No %s found, using schema defaults only", config.TomlFilePath)
-	}
-	if err := migrateAlarmCooldown(cfg); err != nil {
-		return err
-	}
-	if cfg != nil {
+	} else {
 		migrated, migrateErr := migrateMilestoneSettings(cfg)
 		if migrateErr != nil {
 			return migrateErr

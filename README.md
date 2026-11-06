@@ -39,13 +39,11 @@ Motion debug remains a dashboard-gated diagnostic: it requires developer mode or
 testing/nightly firmware. The mode is preserved in Redis and TOML like the other
 screen choices; accepting it in the schema does not bypass the dashboard gate.
 
-### Alarm cooldown migration
+### Alarm cooldown default
 
-`alarm.l1-cooldown` defaults to two seconds. Before hydrating settings, the service
-migrates a saved value of 15 to 2 once, leaving other values unchanged. Completion
-is recorded in `settings.toml.alarm-cooldown-v1` beside the configured TOML file,
-so a later explicit choice of 15 survives restarts. Keep that marker with settings
-backups to preserve migration state.
+`alarm.l1-cooldown` defaults to two seconds when unset. Explicit saved values,
+including 15, take precedence and remain unchanged. Schema defaults are populated
+in Redis but are not persisted as user choices.
 
 ### APN ownership
 
