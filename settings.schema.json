@@ -64,8 +64,8 @@
   },
   "alarm.hairtrigger": {
     "type": "bool",
-    "description": "Sound a short alarm immediately after the first detected motion.",
-    "label": "Immediate First-Motion Alarm",
+    "description": "Sound a short alarm after the first trigger and the 750 ms authentication grace period. Motion waking the scooter from hibernation only flashes the hazards.",
+    "label": "Short First-Trigger Alarm",
     "user-visible": false,
     "service": "alarm-service",
     "default": false,
@@ -73,8 +73,8 @@
   },
   "alarm.hairtrigger-duration": {
     "type": "int",
-    "description": "Set how long the immediate first-motion alarm remains active.",
-    "label": "Immediate Alarm Duration",
+    "description": "Set the requested duration of the short first-trigger alarm. It can end early when the warning stage ends.",
+    "label": "Short First-Trigger Alarm Duration",
     "user-visible": false,
     "service": "alarm-service",
     "default": 3,
@@ -85,8 +85,8 @@
   },
   "alarm.l1-cooldown": {
     "type": "int",
-    "description": "Wait after the first trigger before checking for another trigger during a five-second window. Repeated triggers during the wait do not escalate the alarm.",
-    "label": "Level 1 Trigger Delay",
+    "description": "Minimum time after the first trigger before another motion, button or handlebar trigger can start the full alarm. Triggers during this delay reset quiet time but do not escalate. Unauthorized seatbox opening bypasses the delay.",
+    "label": "L2 Escalation Delay",
     "user-visible": false,
     "service": "alarm-service",
     "default": 2,
@@ -94,6 +94,18 @@
     "min": 1,
     "max": 60,
     "example": 2
+  },
+  "alarm.quiet-time": {
+    "type": "int",
+    "description": "Time without an accepted trigger before an alarm episode ends and monitoring returns to its armed state. Each accepted trigger resets this timer, including during the L2 escalation delay and full alarm bursts. A running burst finishes before rearming. The maximum-burst safety limit still applies.",
+    "label": "Quiet Time Before Rearming",
+    "user-visible": false,
+    "service": "alarm-service",
+    "default": 30,
+    "unit": "seconds",
+    "min": 1,
+    "max": 300,
+    "example": 30
   },
   "alarm.honk": {
     "type": "bool",
@@ -106,8 +118,8 @@
   },
   "alarm.duration": {
     "type": "int",
-    "description": "Set how long a triggered alarm remains active.",
-    "label": "Alarm Duration",
+    "description": "Duration of each full alarm burst with hazards and, when enabled, the horn. Further triggers do not extend a running burst. After it ends, another trigger can start a new burst until the quiet-time or maximum-burst limit ends the episode.",
+    "label": "Full Alarm Burst Duration",
     "user-visible": true,
     "service": "alarm-service",
     "default": 30,

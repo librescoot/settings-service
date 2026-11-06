@@ -39,11 +39,17 @@ Motion debug remains a dashboard-gated diagnostic: it requires developer mode or
 testing/nightly firmware. The mode is preserved in Redis and TOML like the other
 screen choices; accepting it in the schema does not bypass the dashboard gate.
 
-### Alarm cooldown default
+### Alarm timing
 
-`alarm.l1-cooldown` defaults to two seconds when unset. Explicit saved values,
-including 15, take precedence and remain unchanged. Schema defaults are populated
-in Redis but are not persisted as user choices.
+`alarm.l1-cooldown`, labelled "L2 Escalation Delay", defaults to two seconds when
+unset. Explicit saved values, including 15, take precedence and remain unchanged.
+Schema defaults are populated in Redis but are not persisted as user choices.
+
+`alarm.quiet-time`, labelled "Quiet Time Before Rearming", is an advanced setting
+with a 30-second default and a range of 1-300 seconds. Accepted disturbances reset
+this timer throughout an alarm episode. A full alarm burst finishes before quiet
+expiry returns monitoring to armed. `alarm.duration` controls the duration of
+each full alarm burst, rather than the length of the whole episode.
 
 ### APN ownership
 
