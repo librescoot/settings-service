@@ -85,15 +85,15 @@
   },
   "alarm.l1-cooldown": {
     "type": "int",
-    "description": "Set how long alarm-service waits after the first motion event before starting the level 1 motion check.",
+    "description": "Wait after the first trigger before checking for another trigger during a five-second window. Repeated triggers during the wait do not escalate the alarm.",
     "label": "Level 1 Trigger Delay",
     "user-visible": false,
     "service": "alarm-service",
-    "default": 15,
+    "default": 2,
     "unit": "seconds",
     "min": 1,
     "max": 60,
-    "example": 15
+    "example": 2
   },
   "alarm.honk": {
     "type": "bool",
