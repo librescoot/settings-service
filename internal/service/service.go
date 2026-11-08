@@ -17,6 +17,8 @@ import (
 	"github.com/librescoot/settings-service/internal/schema"
 )
 
+const dataBrowserSetting = "bluetooth.data-browser"
+
 type SettingsService struct {
 	redisClient *redis.Client
 	schema      *schema.Schema
@@ -37,7 +39,8 @@ type SettingsService struct {
 	overlayActive bool
 	overlayBase   map[string]capturedVal
 
-	lastPersisted map[string]string
+	lastPersisted   map[string]string
+	dataBrowserBoot string
 
 	osReleasePath                 string
 	localReleaseChannel           string
@@ -154,6 +157,13 @@ func (s *SettingsService) LoadSettingsFromTOML() error {
 		fields[key] = fallback
 		userSet[key] = struct{}{}
 	}
+	dataBrowser, ok := fields[dataBrowserSetting].(string)
+	if !ok || (dataBrowser != "true" && dataBrowser != "false") {
+		dataBrowser = "false"
+		delete(userSet, dataBrowserSetting)
+	}
+	fields[dataBrowserSetting] = dataBrowser
+	s.dataBrowserBoot = dataBrowser
 	s.applyInitialChannelDefaults(fields, userSet)
 	rewriteToml = len(droppedTransient) > 0 || len(invalid) > 0
 	if destination.HealUUIDs(fields, userSet) {
@@ -230,6 +240,17 @@ func (s *SettingsService) SaveSettingsToTOML() error {
 	overlayBaseForPersist(settings, s.overlayActive, s.overlayBase)
 
 	persisted := filterUserSet(settings, s.userSetKeys)
+	// Preserve the locally edited value without accepting Redis as its source.
+	local, localErr := config.LoadFromFile()
+	if localErr != nil && !os.IsNotExist(localErr) {
+		return fmt.Errorf("read local-only settings: %w", localErr)
+	}
+	delete(persisted, dataBrowserSetting)
+	if localErr == nil {
+		if value, ok := local.ToRedisFields()[dataBrowserSetting]; ok {
+			persisted[dataBrowserSetting] = fmt.Sprint(value)
+		}
+	}
 	// Validator errors can contain submitted values; diagnostics identify only the key.
 	for key, value := range persisted {
 		if err := s.schema.ValidateValue(key, value); err != nil {
@@ -396,6 +417,10 @@ func (s *SettingsService) WatchSettings() {
 			case redis.SettingsChannel:
 				log.Printf("Received update notification for field: %s", msg.Payload)
 
+				if msg.Payload == dataBrowserSetting {
+					s.restoreDataBrowserSetting()
+					continue
+				}
 				if s.consumeGeneratedNotification(msg.Payload) {
 					continue
 				}
@@ -449,6 +474,22 @@ func (s *SettingsService) WatchSettings() {
 			}
 		case <-s.ctx.Done():
 			return
+		}
+	}
+}
+
+func (s *SettingsService) restoreDataBrowserSetting() {
+	s.mu.Lock()
+	value := s.dataBrowserBoot
+	s.mu.Unlock()
+	current, exists, err := s.redisClient.GetSettingField(dataBrowserSetting)
+	if err != nil {
+		log.Printf("Error reading %s: %v", dataBrowserSetting, err)
+		return
+	}
+	if !exists || current != value {
+		if err := s.redisClient.SetSettingField(dataBrowserSetting, value); err != nil {
+			log.Printf("Error restoring %s: %v", dataBrowserSetting, err)
 		}
 	}
 }

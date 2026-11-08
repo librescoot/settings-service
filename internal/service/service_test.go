@@ -369,7 +369,13 @@ func TestLoadSettingsFromTOMLMigratesMilestones(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(svc.Close)
+	var watchDone chan struct{}
+	t.Cleanup(func() {
+		svc.Close()
+		if watchDone != nil {
+			<-watchDone
+		}
+	})
 	for range 2 {
 		if err := svc.LoadSettingsFromTOML(); err != nil {
 			t.Fatal(err)
@@ -395,7 +401,11 @@ func TestLoadSettingsFromTOMLMigratesMilestones(t *testing.T) {
 			t.Fatalf("legacy Redis setting remains: exists=%v, err=%v", exists, err)
 		}
 	}
-	go svc.WatchSettings()
+	watchDone = make(chan struct{})
+	go func() {
+		svc.WatchSettings()
+		close(watchDone)
+	}()
 	waitForSettingsSubscription(t, server)
 	server.HSet(redis.SettingsKey, "dashboard.milestones.mode", "all")
 	server.Publish(redis.SettingsChannel, "dashboard.milestones.mode")

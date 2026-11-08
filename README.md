@@ -155,6 +155,8 @@ apn = "example.apn"
 
 Transient schema keys remain in Redis and are removed from TOML when encountered. The service preserves the effective base value rather than its temporary overlay value when saving while service mode is active.
 
+`bluetooth.data-browser` defaults to false and is local-only. Set it directly in `settings.toml` through USB or local administration; settings-service reads it at startup and rejects Redis updates. Restart bluetooth-service after changing it. The Bluetooth browser restricts access to selected destinations even when enabled.
+
 A boolean schema setting can provide `channel-defaults` for `stable`, `testing`, and `nightly`. At boot, settings-service infers each installed component's channel from `version:mdb[version_id]` and `version:dbc[version_id]`, then applies the matching value unless TOML contains a user-set value. If components differ, a `true` value from either component wins. `scooter.developer-mode` uses this to enable development and diagnostic controls by default on testing or nightly.
 
 For APN management, modem-service v0.15.1 or later, NetworkManager and the target WWAN connection must be available. WireGuard configuration files must have a `.conf` suffix in `/data/wireguard`; SHA-256 sidecar files are maintained in the same directory.

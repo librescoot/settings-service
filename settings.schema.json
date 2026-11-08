@@ -1,4 +1,14 @@
 {
+  "bluetooth.data-browser": {
+    "type": "bool",
+    "description": "Allow the restricted Bluetooth file browser. Set in settings.toml over USB and restart the Bluetooth service.",
+    "label": "Bluetooth File Browser",
+    "user-visible": true,
+    "read-only": true,
+    "service": "bluetooth-service",
+    "default": false,
+    "example": true
+  },
   "alarm.enabled": {
     "type": "bool",
     "description": "Enable or disable the alarm system.",
