@@ -1,9 +1,6 @@
 package schema
 
-import (
-	"fmt"
-	"github.com/nyaruka/phonenumbers"
-)
+import "fmt"
 
 func validateSMSForwardDestination(value string) error {
 	if value == "off" {
@@ -17,14 +14,5 @@ func validateSMSForwardDestination(value string) error {
 			return fmt.Errorf("destination must be off or an international number")
 		}
 	}
-	number, err := phonenumbers.Parse(value, "")
-	if err != nil || !phonenumbers.IsValidNumber(number) {
-		return fmt.Errorf("destination must be a valid standard number")
-	}
-	switch phonenumbers.GetNumberType(number) {
-	case phonenumbers.MOBILE, phonenumbers.FIXED_LINE, phonenumbers.FIXED_LINE_OR_MOBILE:
-		return nil
-	default:
-		return fmt.Errorf("destination must be a standard mobile or landline number")
-	}
+	return nil
 }
